@@ -1,0 +1,59 @@
+name: Guardian CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '.claude/**'
+      - 'templates/**'
+      - 'CLAUDE.md'
+
+jobs:
+  validate:
+    name: Harness Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - uses: actions/checkout@v6
+        with:
+          path: pr
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Validate harness integrity
+        run: |
+          echo "=== Agent Frontmatter Validation ==="
+          for f in pr/.claude/agents/*.md; do
+            [ -f "$f" ] || continue
+            if ! head -1 "$f" | grep -q "^---"; then
+              echo "::error::Missing frontmatter: $f"
+              exit 1
+            fi
+          done
+          echo "All agent frontmatter valid"
+
+          echo "=== Skill Reference Check ==="
+          for f in pr/.claude/agents/*.md; do
+            [ -f "$f" ] || continue
+            grep "^skills:" -A 20 "$f" 2>/dev/null | grep "  - " | sed 's/.*- //' | while read skill; do
+              if [ ! -f "pr/.claude/skills/$skill/SKILL.md" ]; then
+                echo "::error::Invalid skill ref in $f: $skill"
+                exit 1
+              fi
+            done
+          done
+          echo "All skill references valid"
+
+          echo "=== Naming Convention Check ==="
+          for f in pr/.claude/agents/*.md; do
+            bname=$(basename "$f" .md)
+            if ! echo "$bname" | grep -qE '^[a-z][a-z0-9-]*$'; then
+              echo "::error::Invalid agent name (not kebab-case): $bname"
+              exit 1
+            fi
+          done
+          echo "All naming conventions valid"

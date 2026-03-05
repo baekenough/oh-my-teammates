@@ -1,0 +1,41 @@
+{
+  "name": "oh-my-teammates",
+  "version": "0.1.0",
+  "description": "Team collaboration addon for oh-my-customcode - organizational harness management",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "omcustom-team": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "test": "bun test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "peerDependencies": {
+    "oh-my-customcode": ">=0.18.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  },
+  "keywords": [
+    "claude-code",
+    "ai-agent",
+    "team-collaboration",
+    "harness",
+    "oh-my-customcode"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/baekenough/oh-my-teammates.git"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

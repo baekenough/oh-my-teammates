@@ -1,0 +1,11 @@
+# oh-my-teammates team configuration
+# This file maps team members to their GitHub accounts
+
+admin: ~  # Set to the team admin's username
+
+members: {}
+  # example:
+  # john-doe:
+  #   github: john-github-username
+  #   email: john@example.com
+  #   role: admin  # admin | member
