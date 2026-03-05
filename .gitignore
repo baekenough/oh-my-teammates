@@ -5,3 +5,21 @@ dist/
 .env.local
 coverage/
 .DS_Store
+
+# oh-my-customcode framework (local development only)
+.claude/agents/
+.claude/skills/
+.claude/rules/
+.claude/hooks/
+.claude/contexts/
+.claude/ontology/
+.claude/settings.json
+.claude/settings.local.json
+.claude/agent-memory/
+.claude/agent-memory-local/
+.claude/statusline.sh
+.claude/claude-native-hash.txt
+guides/
+.mcp.json
+.omcustomrc.json
+.omcustom-customizations.json
