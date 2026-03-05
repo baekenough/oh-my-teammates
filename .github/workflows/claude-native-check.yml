@@ -25,4 +25,4 @@ jobs:
       dry_run: ${{ inputs.dry_run || false }}
       force: ${{ inputs.force || false }}
     secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTROPIC_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
