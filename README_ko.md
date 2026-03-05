@@ -67,29 +67,28 @@ omcustom-team init
 
 ### `omcustom-team todo`
 
-스튜어드와 연동된 팀 작업을 관리합니다:
+팀 작업을 관리합니다:
 
 ```bash
 # 모든 팀 TODO 목록 보기
 omcustom-team todo list
 
 # 새 팀 작업 추가
-omcustom-team todo add --priority high --domain backend "API 요청 제한 검토"
-
-# 스튜어드에 할당
-omcustom-team todo assign <id> --steward john-doe
+omcustom-team todo add API 요청 제한 수정
 ```
 
 ## 대시보드
 
-SvelteKit 대시보드로 팀의 oh-my-customcode 하네스를 시각적으로 확인합니다:
+`omcustom-team init` 실행 시 프로젝트에 SvelteKit 대시보드가 스캐폴딩됩니다. oh-my-customcode 하네스를 시각적으로 확인할 수 있습니다:
 
 - **에이전트** — 등록된 모든 에이전트와 역량 탐색
 - **스킬** — 스킬 정의 및 에이전트 연관 관계 확인
 - **규칙** — MUST/SHOULD/MAY 규칙을 우선순위별로 조회
 - **가이드** — 개발자 가이드 및 레퍼런스 문서 접근
+- **스튜어드** — 도메인 소유권 배정 현황
+- **팀** — 팀 멤버 상태
 
-다크모드와 모바일 지원을 포함하며, `main` 브랜치 푸시 시 CI를 통해 자동 배포됩니다.
+SvelteKit + adapter-static으로 구축되며, 다크모드와 모바일을 지원합니다. 각 프로젝트의 GitHub Pages에서 배포할 수 있습니다.
 
 ## 설정
 
@@ -229,7 +228,7 @@ bun run build        # 프로덕션 빌드
 |------|------|------|
 | V1 | Guardian CI, 세션 로깅, 스튜어드, 팀 TODO | **출시 (v0.2.0)** |
 | V1.5 | 정적 HTML 리포트 (`omcustom-team report`) | 계획됨 |
-| V2 | 웹 대시보드 -- 모니터링 + 관리 | [#205](https://github.com/baekenough/oh-my-customcode/issues/205) |
+| V2 | 대시보드 고도화 — 온톨로지 그래프, 세션 타임라인, RAR 메트릭 | 계획됨 |
 | V3 | 적응형 확장 -- 자동 감지 및 추천 | 계획됨 |
 
 ## 관련 프로젝트

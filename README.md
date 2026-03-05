@@ -67,29 +67,28 @@ omcustom-team init
 
 ### `omcustom-team todo`
 
-Manage team-level tasks linked to stewards:
+Manage team-level tasks:
 
 ```bash
 # List all team TODOs
 omcustom-team todo list
 
 # Add a new team task
-omcustom-team todo add --priority high --domain backend "Review API rate limiting"
-
-# Assign to steward
-omcustom-team todo assign <id> --steward john-doe
+omcustom-team todo add Fix API rate limiting
 ```
 
 ## Dashboard
 
-The SvelteKit dashboard provides a visual overview of your team's oh-my-customcode harness:
+The SvelteKit dashboard is scaffolded into your project when you run `omcustom-team init`. It provides a visual overview of your oh-my-customcode harness:
 
-- **Agents** — Browse and inspect all registered agents with their capabilities
-- **Skills** — Explore skill definitions and their agent associations
-- **Rules** — View MUST/SHOULD/MAY rules with priority levels
-- **Guides** — Access developer guides and reference documentation
+- **Agents** — Browse all registered agents with their capabilities
+- **Skills** — Explore skill definitions and agent associations
+- **Rules** — View MUST/SHOULD/MAY rules by priority
+- **Guides** — Access developer guides and reference docs
+- **Stewards** — Domain ownership assignments
+- **Team** — Team member status
 
-Features dark mode and mobile support. Auto-deployed via CI on push to `main`.
+Built with SvelteKit + adapter-static. Supports dark mode and mobile. Deploy to GitHub Pages from your own project.
 
 ## Configuration
 
@@ -229,7 +228,7 @@ bun run build        # Build for production
 |-------|---------|--------|
 | V1 | Guardian CI, Session Logging, Stewards, Team TODO | **Shipped (v0.2.0)** |
 | V1.5 | Static HTML report (`omcustom-team report`) | Planned |
-| V2 | Web Dashboard -- monitoring + management | [#205](https://github.com/baekenough/oh-my-customcode/issues/205) |
+| V2 | Dashboard enhancements — ontology graph, session timeline, RAR metrics | Planned |
 | V3 | Adaptive Expansion -- auto-detect and recommend | Planned |
 
 ## Related
