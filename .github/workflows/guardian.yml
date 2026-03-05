@@ -7,6 +7,8 @@ on:
       - '.claude/**'
       - 'templates/**'
       - 'CLAUDE.md'
+      - 'STEWARDS.yaml'
+      - 'team.yaml'
 
 jobs:
   validate:
@@ -57,3 +59,49 @@ jobs:
             fi
           done
           echo "All naming conventions valid"
+
+      - name: Validate STEWARDS.yaml (conditional)
+        if: hashFiles('pr/STEWARDS.yaml') != ''
+        run: |
+          echo "=== STEWARDS.yaml Validation ==="
+          f="pr/STEWARDS.yaml"
+
+          # Must be non-empty with at least one top-level mapping key
+          if [ ! -s "$f" ]; then
+            echo "::error::STEWARDS.yaml is empty"
+            exit 1
+          fi
+
+          if ! grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:' "$f"; then
+            echo "::error::STEWARDS.yaml has no recognizable top-level keys"
+            exit 1
+          fi
+
+          echo "STEWARDS.yaml structure OK"
+
+      - name: Skip STEWARDS.yaml check (file absent)
+        if: hashFiles('pr/STEWARDS.yaml') == ''
+        run: echo "::notice::STEWARDS.yaml not present — skipping validation"
+
+      - name: Validate team.yaml (conditional)
+        if: hashFiles('pr/team.yaml') != ''
+        run: |
+          echo "=== team.yaml Validation ==="
+          f="pr/team.yaml"
+
+          # Must be non-empty with at least one top-level mapping key
+          if [ ! -s "$f" ]; then
+            echo "::error::team.yaml is empty"
+            exit 1
+          fi
+
+          if ! grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*\s*:' "$f"; then
+            echo "::error::team.yaml has no recognizable top-level keys"
+            exit 1
+          fi
+
+          echo "team.yaml structure OK"
+
+      - name: Skip team.yaml check (file absent)
+        if: hashFiles('pr/team.yaml') == ''
+        run: echo "::notice::team.yaml not present — skipping validation"

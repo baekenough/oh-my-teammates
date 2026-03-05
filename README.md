@@ -11,11 +11,23 @@
 [![CI](https://github.com/baekenough/oh-my-teammates/actions/workflows/ci.yml/badge.svg)](https://github.com/baekenough/oh-my-teammates/actions/workflows/ci.yml)
 [![Security Audit](https://github.com/baekenough/oh-my-teammates/actions/workflows/security-audit.yml/badge.svg)](https://github.com/baekenough/oh-my-teammates/actions/workflows/security-audit.yml)
 
-**[한국어 문서 (Korean)](./README_ko.md)**
+**[한국어 문서 (Korean)](./README_ko.md)** | 📐 [Architecture Guide](ARCHITECTURE.md)
 
 **Team collaboration addon for [oh-my-customcode](https://github.com/baekenough/oh-my-customcode) — share sessions, protect your harness, and govern together.**
 
 Like oh-my-customcode gave you a personal agent stack, oh-my-teammates makes it work for your whole team.
+
+## Features
+
+| Module | Description |
+|--------|-------------|
+| `team-config.ts` | Parse and manage `team.yaml` with CRUD operations, admin roles, and schema validation |
+| `session-logger.ts` | `bun:sqlite`-based session tracking with structured event logging |
+| `stewards.ts` | `STEWARDS.yaml` management with 8-domain model and CODEOWNERS generation |
+| `init.ts` | Project scanning, dependency analysis, and team configuration scaffolding |
+| `team-todo.ts` | Team-level task management with priority levels and steward-based auto-assignment |
+| `cli.ts` | `omcustom-team init` and `omcustom-team todo` CLI commands |
+| Dashboard | SvelteKit-based agent/skill/rule/guide visualization with dark mode and mobile support |
 
 ## What It Does
 
@@ -38,12 +50,46 @@ bun add -d @oh-my-customcode/oh-my-teammates
 omcustom-team init
 ```
 
-`omcustom-team init` will:
+## CLI Usage
+
+### `omcustom-team init`
+
+Bootstraps team configuration for your project:
+
+```bash
+omcustom-team init
+```
 
 1. **Scan** your project for languages, frameworks, and file patterns
 2. **Analyze** git history to map contributors to domains
 3. **Generate** `team.yaml` (member mapping) and `STEWARDS.yaml` (domain ownership)
 4. **Create** `.claude/team/` directory structure for shared knowledge
+
+### `omcustom-team todo`
+
+Manage team-level tasks linked to stewards:
+
+```bash
+# List all team TODOs
+omcustom-team todo list
+
+# Add a new team task
+omcustom-team todo add --priority high --domain backend "Review API rate limiting"
+
+# Assign to steward
+omcustom-team todo assign <id> --steward john-doe
+```
+
+## Dashboard
+
+The SvelteKit dashboard provides a visual overview of your team's oh-my-customcode harness:
+
+- **Agents** — Browse and inspect all registered agents with their capabilities
+- **Skills** — Explore skill definitions and their agent associations
+- **Rules** — View MUST/SHOULD/MAY rules with priority levels
+- **Guides** — Access developer guides and reference documentation
+
+Features dark mode and mobile support. Auto-deployed via CI on push to `main`.
 
 ## Configuration
 
@@ -135,6 +181,7 @@ Validates harness integrity on every PR targeting `main` or `develop`:
 - **Agent frontmatter** — YAML headers present and valid
 - **Skill references** — All referenced skills exist
 - **Naming conventions** — kebab-case enforcement
+- **STEWARDS.yaml / team.yaml** — Validated when present
 - **Execution time** — ~860ms (single job)
 
 Triggered only when `.claude/` files change.
@@ -162,20 +209,11 @@ Enhanced `sys-naggy` agent with team features:
 
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
-| CI | PR | Lint (Biome) + Test (Bun) |
-| Guardian | PR (.claude/** changes) | Harness integrity validation |
+| CI | PR | Lint (Biome) + Typecheck + Test (Bun, 99% coverage gate) + Build |
+| Guardian | PR (.claude/** changes) | Harness integrity + STEWARDS.yaml/team.yaml validation |
 | Claude Native Check | Weekly / Manual | Official docs compliance |
 | Security Audit | Weekly / PR | Dependency vulnerability scan |
 | Release | Tag push (v*) | Build -> npm publish -> GitHub Release |
-
-## Roadmap
-
-| Phase | Feature | Status |
-|-------|---------|--------|
-| V1 | Guardian CI, Session Logging, Stewards, Team TODO | In Progress |
-| V1.5 | Static HTML report (`omcustom-team report`) | Planned |
-| V2 | Web Dashboard -- monitoring + management | [#205](https://github.com/baekenough/oh-my-customcode/issues/205) |
-| V3 | Adaptive Expansion -- auto-detect and recommend | Planned |
 
 ## Development
 
@@ -185,9 +223,19 @@ bun test             # Run tests
 bun run build        # Build for production
 ```
 
+## Roadmap
+
+| Phase | Feature | Status |
+|-------|---------|--------|
+| V1 | Guardian CI, Session Logging, Stewards, Team TODO | **Shipped (v0.2.0)** |
+| V1.5 | Static HTML report (`omcustom-team report`) | Planned |
+| V2 | Web Dashboard -- monitoring + management | [#205](https://github.com/baekenough/oh-my-customcode/issues/205) |
+| V3 | Adaptive Expansion -- auto-detect and recommend | Planned |
+
 ## Related
 
 - [oh-my-customcode](https://github.com/baekenough/oh-my-customcode) — Core agent harness (personal)
+- [CHANGELOG](./CHANGELOG.md) — Release history
 - [Issue #203](https://github.com/baekenough/oh-my-customcode/issues/203) — Architecture design
 - [Issue #205](https://github.com/baekenough/oh-my-customcode/issues/205) — Web dashboard design
 

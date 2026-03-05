@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-customcode/oh-my-teammates",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Team collaboration addon for oh-my-customcode - organizational harness management",
   "type": "module",
   "main": "dist/index.js",
@@ -8,38 +8,33 @@
   "bin": {
     "omcustom-team": "dist/cli.js"
   },
-  "files": [
-    "dist/",
-    "templates/",
-    "README.md",
-    "LICENSE"
-  ],
+  "files": ["dist/", "templates/", "README.md", "LICENSE"],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node",
+    "build": "bun build src/index.ts cli.ts --outdir dist --target node",
     "test": "bun test",
     "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": ["bunx biome check --write"]
   },
   "peerDependencies": {
     "oh-my-customcode": ">=0.18.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.0"
+    "@biomejs/biome": "^1.9.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2"
   },
   "dependencies": {
     "yaml": "^2.7.0"
   },
-  "keywords": [
-    "claude-code",
-    "ai-agent",
-    "team-collaboration",
-    "harness",
-    "oh-my-customcode"
-  ],
+  "keywords": ["claude-code", "ai-agent", "team-collaboration", "harness", "oh-my-customcode"],
   "license": "MIT",
   "repository": {
     "type": "git",

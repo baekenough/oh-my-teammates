@@ -23,3 +23,9 @@ guides/
 .mcp.json
 .omcustomrc.json
 .omcustom-customizations.json
+
+# Root placeholder (replaced by src/index.ts)
+/index.ts
+
+# Backup files
+*.bak
