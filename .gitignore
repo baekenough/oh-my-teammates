@@ -1,0 +1,34 @@
+node_modules/
+dist/
+*.tgz
+.env
+.env.local
+coverage/
+.DS_Store
+
+# oh-my-customcode framework (local development only)
+.claude/agents/
+.claude/skills/
+.claude/rules/
+.claude/hooks/
+.claude/contexts/
+.claude/ontology/
+.claude/settings.json
+.claude/settings.local.json
+.claude/agent-memory/
+.claude/agent-memory-local/
+.claude/statusline.sh
+.claude/claude-native-hash.txt
+guides/
+.mcp.json
+.omcustomrc.json
+.omcustom-customizations.json
+
+# Dashboard (for target projects, not this repo)
+dashboard/
+
+# Root placeholder (replaced by src/index.ts)
+/index.ts
+
+# Backup files
+*.bak

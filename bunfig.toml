@@ -1,0 +1,10 @@
+[test]
+coverage = true
+coverageReporter = ["text", "lcov"]
+coverageSkipTestFiles = true
+
+[test.coverageThreshold]
+lines = 0.99
+functions = 0.99
+branches = 0.99
+statements = 0.99

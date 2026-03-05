@@ -1,0 +1,28 @@
+name: Claude Native Check
+
+on:
+  schedule:
+    - cron: '0 19 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (no issue creation)'
+        type: boolean
+        default: false
+      force:
+        description: 'Force verification even if docs unchanged'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  verify:
+    uses: baekenough/oh-my-customcode/.github/workflows/reusable-claude-native.yml@develop
+    with:
+      dry_run: ${{ inputs.dry_run || false }}
+      force: ${{ inputs.force || false }}
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
