@@ -4,7 +4,6 @@
   "description": "Team collaboration addon for oh-my-customcode - organizational harness management",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "bin": {
     "omcustom-team": "dist/cli.js"
   },
@@ -14,7 +13,7 @@
     "registry": "https://registry.npmjs.org"
   },
   "scripts": {
-    "build": "bun build src/index.ts cli.ts --outdir dist --target node",
+    "build": "bun build src/index.ts --outfile dist/index.js --target node && bun build cli.ts --outfile dist/cli.js --target node",
     "test": "bun test",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
