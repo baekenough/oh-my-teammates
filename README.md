@@ -1,44 +1,55 @@
+<div align="center">
+  <img src="assets/banner.png" alt="oh-my-teammates banner" width="800" />
+</div>
+
 # oh-my-teammates
 
-> Team collaboration addon for [oh-my-customcode](https://github.com/baekenough/oh-my-customcode) — organizational harness management
+> **Your Team's Agent Stack, Together**
 
-## Overview
+[![npm version](https://img.shields.io/npm/v/@oh-my-customcode/oh-my-teammates.svg)](https://www.npmjs.com/package/@oh-my-customcode/oh-my-teammates)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/baekenough/oh-my-teammates/actions/workflows/ci.yml/badge.svg)](https://github.com/baekenough/oh-my-teammates/actions/workflows/ci.yml)
+[![Security Audit](https://github.com/baekenough/oh-my-teammates/actions/workflows/security-audit.yml/badge.svg)](https://github.com/baekenough/oh-my-teammates/actions/workflows/security-audit.yml)
 
-oh-my-teammates extends oh-my-customcode with team-level features:
+**[한국어 문서 (Korean)](./README_ko.md)**
 
-- **Session Sharing**: Share Claude session knowledge across team members via selective symlinks
-- **Guardian CI**: Automated harness validation on PRs (~860ms)
-- **Steward System**: Domain-based ownership with auto-assignment on init
-- **Team TODO**: Shared task management with steward integration
-- **Quality Metrics**: Rule Adherence Rate (RAR) tracking with 98% target
+**Team collaboration addon for [oh-my-customcode](https://github.com/baekenough/oh-my-customcode) — share sessions, protect your harness, and govern together.**
 
-## Prerequisites
+Like oh-my-customcode gave you a personal agent stack, oh-my-teammates makes it work for your whole team.
 
-- [oh-my-customcode](https://github.com/baekenough/oh-my-customcode) >= 0.18.0
-- [Bun](https://bun.sh) >= 1.0.0
+## What It Does
 
-## Installation
-
-```bash
-bun add -d @oh-my-customcode/oh-my-teammates
-```
+| Feature | Description |
+|---------|-------------|
+| **Session Sharing** | Share Claude session knowledge across team via selective symlinks |
+| **Guardian CI** | Automated harness validation on every PR (~860ms) |
+| **Steward System** | Domain-based ownership with auto-assignment on init |
+| **Team TODO** | Shared task management linked to stewards and issues |
+| **Quality Metrics** | Rule Adherence Rate (RAR) tracking, target 98% |
+| **Adaptive Expansion** | Auto-detect tech stack changes and recommend new agents/skills |
 
 ## Quick Start
 
 ```bash
-# Initialize team features on existing project
-omcustom-team init
+# Install (requires oh-my-customcode >= 0.18.0)
+bun add -d @oh-my-customcode/oh-my-teammates
 
-# This will:
-# 1. Scan project for tech stack and file patterns
-# 2. Analyze git history for contributor mapping
-# 3. Generate team.yaml and STEWARDS.yaml
-# 4. Set up .claude/team/ directory structure
+# Initialize team features on your project
+omcustom-team init
 ```
+
+`omcustom-team init` will:
+
+1. **Scan** your project for languages, frameworks, and file patterns
+2. **Analyze** git history to map contributors to domains
+3. **Generate** `team.yaml` (member mapping) and `STEWARDS.yaml` (domain ownership)
+4. **Create** `.claude/team/` directory structure for shared knowledge
 
 ## Configuration
 
 ### team.yaml
+
+Admin-managed file mapping team members to accounts:
 
 ```yaml
 admin: john-doe
@@ -55,47 +66,141 @@ members:
 
 ### STEWARDS.yaml
 
-Auto-generated on `omcustom-team init`, maps 8 domains to team members:
+Auto-generated domain ownership. 8 domains x 2 roles (primary + backup):
 
 | Domain | Scope |
 |--------|-------|
-| Languages | lang-* agents, language skills |
-| Backend | be-* agents, API skills |
-| Frontend | fe-* agents, UI skills |
-| DE | de-* agents, pipeline skills |
+| Languages | lang-* agents, language-specific skills |
+| Backend | be-* agents, API framework skills |
+| Frontend | fe-* agents, UI/UX skills |
+| Data Engineering | de-* agents, pipeline skills |
 | DB/Infra | db-*, infra-* agents |
 | Tooling | tool-*, mgr-* agents |
-| QA/Arch | qa-*, arch-* agents |
-| Governance | rules, CLAUDE.md |
+| QA/Architecture | qa-*, arch-* agents |
+| Governance | rules, CLAUDE.md, team config |
+
+Example auto-generated output:
+
+```yaml
+domains:
+  languages:
+    primary: john-doe    # 85% of .ts commits
+    backup: jane-doe     # 12% of .ts commits
+    active: true
+  de:
+    active: false        # no pipeline files detected
+```
 
 ## Session Sharing
 
-Share Claude session knowledge via selective symlinks:
+Share Claude session knowledge without external infrastructure:
 
 ```bash
-# Share specific subdirectories (run per developer)
+# Set up selective symlinks (per developer)
 omcustom-team link
+```
 
-# This creates symlinks:
-# ~/.claude/agent-memory → .claude/team/employees/<username>/agent-memory
-# ~/.claude/MEMORY.md → .claude/team/employees/<username>/MEMORY.md
+### What Gets Shared
+
+| Content | Shared? | Reason |
+|---------|---------|--------|
+| `agent-memory/` (project scope) | Yes | Team-wide learnings |
+| `MEMORY.md` | Yes | Session summaries |
+| Session logs (Parquet) | Yes | Knowledge pipeline |
+| Architectural decisions | Yes | Team alignment |
+| `settings.local.json` | No | Personal config |
+| API keys / credentials | No | Security |
+
+### Directory Structure
+
+```
+.claude/team/
+├── shared-memory/          # Cross-team learnings
+├── session-logs/           # Exported session summaries
+├── employees/              # Per-member profiles
+│   ├── john-doe/
+│   │   ├── MEMORY.md
+│   │   └── preferences.yaml
+│   └── jane-doe/
+│       └── ...
+├── team.yaml               # Member mapping
+├── STEWARDS.yaml           # Domain ownership
+└── TODO.md                 # Shared team tasks
 ```
 
 ## Guardian CI
 
-Validates harness integrity on every PR:
+Validates harness integrity on every PR targeting `main` or `develop`:
 
-- Agent frontmatter validation
-- Skill reference checking
-- Routing pattern completeness
-- CLAUDE.md sync verification
+- **Agent frontmatter** — YAML headers present and valid
+- **Skill references** — All referenced skills exist
+- **Naming conventions** — kebab-case enforcement
+- **Execution time** — ~860ms (single job)
+
+Triggered only when `.claude/` files change.
+
+## Quality Metrics
+
+| Metric | Target | Description |
+|--------|--------|-------------|
+| **RAR** | 98% | Rule Adherence Rate = violation-free tasks / total |
+| Execution overhead | < 5% | Time cost of compliance |
+| Token waste | < 2% | Token cost of compliance |
+
+Measured via before/after paired comparison (each developer is their own control).
+
+## Team TODO
+
+Enhanced `sys-naggy` agent with team features:
+
+- `.claude/team/TODO.md` — Git-tracked, team-visible
+- `team:` prefix for team tasks vs personal tasks
+- Auto-generated TODO items from unfinished session work
+- Steward-based task routing
+
+## CI Workflows
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| CI | PR | Lint (Biome) + Test (Bun) |
+| Guardian | PR (.claude/** changes) | Harness integrity validation |
+| Claude Native Check | Weekly / Manual | Official docs compliance |
+| Security Audit | Weekly / PR | Dependency vulnerability scan |
+| Release | Tag push (v*) | Build -> npm publish -> GitHub Release |
+
+## Roadmap
+
+| Phase | Feature | Status |
+|-------|---------|--------|
+| V1 | Guardian CI, Session Logging, Stewards, Team TODO | In Progress |
+| V1.5 | Static HTML report (`omcustom-team report`) | Planned |
+| V2 | Web Dashboard -- monitoring + management | [#205](https://github.com/baekenough/oh-my-customcode/issues/205) |
+| V3 | Adaptive Expansion -- auto-detect and recommend | Planned |
+
+## Development
+
+```bash
+bun install          # Install dependencies
+bun test             # Run tests
+bun run build        # Build for production
+```
 
 ## Related
 
-- [oh-my-customcode](https://github.com/baekenough/oh-my-customcode) — Core AI agent harness
-- [Issue #203](https://github.com/baekenough/oh-my-customcode/issues/203) — Organizational collaboration design
-- [Issue #205](https://github.com/baekenough/oh-my-customcode/issues/205) — Web dashboard (future)
+- [oh-my-customcode](https://github.com/baekenough/oh-my-customcode) — Core agent harness (personal)
+- [Issue #203](https://github.com/baekenough/oh-my-customcode/issues/203) — Architecture design
+- [Issue #205](https://github.com/baekenough/oh-my-customcode/issues/205) — Web dashboard design
 
 ## License
 
-MIT
+[MIT](LICENSE)
+
+---
+
+<p align="center">
+  <strong>Your team's agent stack. Shared knowledge. Governed together.</strong>
+</p>
+
+<p align="center">
+  Made with care by <a href="https://github.com/baekenough">baekenough</a>
+</p>
