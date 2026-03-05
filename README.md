@@ -20,7 +20,7 @@ oh-my-teammates extends oh-my-customcode with team-level features:
 ## Installation
 
 ```bash
-bun add -d oh-my-teammates
+bun add -d @oh-my-customcode/oh-my-teammates
 ```
 
 ## Quick Start

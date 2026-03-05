@@ -1,5 +1,5 @@
 {
-  "name": "oh-my-teammates",
+  "name": "@oh-my-customcode/oh-my-teammates",
   "version": "0.1.0",
   "description": "Team collaboration addon for oh-my-customcode - organizational harness management",
   "type": "module",
@@ -7,6 +7,16 @@
   "types": "dist/index.d.ts",
   "bin": {
     "omcustom-team": "dist/cli.js"
+  },
+  "files": [
+    "dist/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target node",
