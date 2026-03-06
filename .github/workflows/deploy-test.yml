@@ -75,7 +75,8 @@ jobs:
 
       - name: Test global install
         run: |
-          npm install -g @oh-my-customcode/oh-my-teammates --registry http://localhost:4873/
+          # Use --legacy-peer-deps since peerDep oh-my-customcode is not in local Verdaccio
+          npm install -g @oh-my-customcode/oh-my-teammates --registry http://localhost:4873/ --legacy-peer-deps
 
       - name: Test omcustom-team --version
         run: omcustom-team --version
