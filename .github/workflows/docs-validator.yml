@@ -95,11 +95,12 @@ jobs:
 
           # --- Code block fence check ---
           echo "Checking code block syntax..."
+          FENCE="$(printf '%s' '```')"
           for mdfile in README.md README_ko.md ARCHITECTURE.md; do
             if [ ! -f "$mdfile" ]; then
               continue
             fi
-            open_count=$(grep -c '^\`\`\`' "$mdfile" 2>/dev/null || echo 0)
+            open_count=$(grep -c "^${FENCE}" "$mdfile" 2>/dev/null || echo 0)
             if [ $(( open_count % 2 )) -ne 0 ]; then
               ERRORS="${ERRORS}\n- [${mdfile}] Unmatched code fences (odd count: ${open_count})"
             fi
