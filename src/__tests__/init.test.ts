@@ -48,6 +48,19 @@ describe('scanProject', () => {
     expect(result.dependencies).toEqual([]);
     expect(result.filePatterns).toEqual({});
     expect(result.suggestedStewards).toEqual({});
+    expect(result.analysisSkillAvailable).toBe(false);
+  });
+
+  it('detects analysis skill when .claude/skills/analysis/ directory exists', () => {
+    mkdirSync(join(tmpDir, '.claude', 'skills', 'analysis'), { recursive: true });
+
+    const result = scanProject(tmpDir);
+    expect(result.analysisSkillAvailable).toBe(true);
+  });
+
+  it('reports analysis skill as unavailable when directory is absent', () => {
+    const result = scanProject(tmpDir);
+    expect(result.analysisSkillAvailable).toBe(false);
   });
 
   it('counts file extensions correctly', () => {
@@ -240,6 +253,19 @@ describe('scaffoldTeamDir', () => {
     scaffoldTeamDir(tmpDir);
     scaffoldTeamDir(tmpDir);
     expect(existsSync(join(tmpDir, '.claude', 'team'))).toBe(true);
+  });
+
+  it('includes analysis skill note in TODO.md when analysisSkillAvailable is true', () => {
+    scaffoldTeamDir(tmpDir, true);
+    const content = readFileSync(join(tmpDir, '.claude', 'team', 'TODO.md'), 'utf-8');
+    expect(content).toContain('Analysis Skill');
+    expect(content).toContain('/analysis skill is available');
+  });
+
+  it('omits analysis skill note in TODO.md when analysisSkillAvailable is false', () => {
+    scaffoldTeamDir(tmpDir, false);
+    const content = readFileSync(join(tmpDir, '.claude', 'team', 'TODO.md'), 'utf-8');
+    expect(content).not.toContain('Analysis Skill');
   });
 });
 

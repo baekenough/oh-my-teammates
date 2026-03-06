@@ -48,6 +48,8 @@ export interface ProjectScanResult {
   dependencies: string[];
   /** domain -> suggested paths that matched that domain's glob patterns */
   suggestedStewards: Record<string, string[]>;
+  /** Whether the .claude/skills/analysis/ directory is present at runtime */
+  analysisSkillAvailable: boolean;
 }
 
 // ── Directory walker ─────────────────────────────────────────────────────────
@@ -183,24 +185,30 @@ export function scanProject(rootDir = '.'): ProjectScanResult {
     }
   }
 
+  // Detect /analysis skill availability at runtime
+  const analysisSkillAvailable = existsSync(join(absRoot, '.claude', 'skills', 'analysis'));
+
   return {
     detectedDomains: Array.from(detectedDomainSet).sort(),
     filePatterns,
     dependencies,
     suggestedStewards,
+    analysisSkillAvailable,
   };
 }
 
 /**
  * Create the `.claude/team/` directory scaffold and a TODO.md template inside.
+ *
+ * @param analysisSkillAvailable - When true, a note about the /analysis skill is appended to TODO.md.
  */
-export function scaffoldTeamDir(rootDir = '.'): void {
+export function scaffoldTeamDir(rootDir = '.', analysisSkillAvailable = false): void {
   const teamDir = join(rootDir, '.claude', 'team');
   mkdirSync(teamDir, { recursive: true });
 
   const todoPath = join(teamDir, 'TODO.md');
   if (!existsSync(todoPath)) {
-    const template = [
+    const lines = [
       '# Team TODO',
       '',
       'Track team-related tasks here.',
@@ -210,10 +218,19 @@ export function scaffoldTeamDir(rootDir = '.'): void {
       '- [ ] Review and complete STEWARDS.yaml',
       '- [ ] Add team members to team.yaml',
       '- [ ] Configure domain ownership',
-      '',
-    ].join('\n');
+    ];
 
-    writeFileSync(todoPath, template, 'utf-8');
+    if (analysisSkillAvailable) {
+      lines.push(
+        '',
+        '## Analysis Skill',
+        '',
+        '- /analysis skill is available in .claude/skills/analysis/',
+      );
+    }
+
+    lines.push('');
+    writeFileSync(todoPath, lines.join('\n'), 'utf-8');
   }
 }
 
@@ -236,8 +253,8 @@ export async function initTeam(rootDir = '.'): Promise<{
   // 1. Scan project
   const scanResult = scanProject(rootDir);
 
-  // 2. Scaffold .claude/team/ directory
-  scaffoldTeamDir(rootDir);
+  // 2. Scaffold .claude/team/ directory (pass analysis skill availability)
+  scaffoldTeamDir(rootDir, scanResult.analysisSkillAvailable);
 
   // 3. Create team.yaml template if it doesn't exist
   const teamConfigPath = join(rootDir, 'team.yaml');
