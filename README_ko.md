@@ -29,7 +29,7 @@ oh-my-customcode가 개인 에이전트 스택을 제공했다면, oh-my-teammat
 | `cli.ts` | `omcustom-team init` 및 `omcustom-team todo` CLI 명령어 |
 | 대시보드 | SvelteKit 기반 에이전트/스킬/규칙/가이드 시각화, 다크모드 및 모바일 지원 |
 
-## 주요 기능
+## 기능
 
 | 기능 | 설명 |
 |------|------|
