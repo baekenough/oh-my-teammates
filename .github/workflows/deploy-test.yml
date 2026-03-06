@@ -40,15 +40,23 @@ jobs:
             htpasswd:
               file: /tmp/verdaccio/htpasswd
               max_users: 1000
+          uplinks:
+            npmjs:
+              url: https://registry.npmjs.org/
+              timeout: 30s
           packages:
+            '@oh-my-customcode/*':
+              access: $all
+              publish: $all
+              proxy: false
             '@*/*':
               access: $all
               publish: $all
-              proxy: false
+              proxy: npmjs
             '**':
               access: $all
               publish: $all
-              proxy: false
+              proxy: npmjs
           log:
             type: stdout
             format: pretty
@@ -75,7 +83,7 @@ jobs:
 
       - name: Test global install
         run: |
-          # Use --legacy-peer-deps since peerDep oh-my-customcode is not in local Verdaccio
+          # oh-my-customcode is a peerDep not on npm yet; install with legacy-peer-deps
           npm install -g @oh-my-customcode/oh-my-teammates --registry http://localhost:4873/ --legacy-peer-deps
 
       - name: Test omcustom-team --version
