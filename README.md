@@ -43,7 +43,7 @@ Like oh-my-customcode gave you a personal agent stack, oh-my-teammates makes it 
 ## Quick Start
 
 ```bash
-# Install (requires oh-my-customcode >= 0.18.0)
+# Install (requires oh-my-customcode >= 0.19.3)
 bun add -d @oh-my-customcode/oh-my-teammates
 
 # Initialize team features on your project
