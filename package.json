@@ -9,8 +9,7 @@
   },
   "files": ["dist/", "templates/", "README.md", "LICENSE"],
   "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org"
+    "access": "public"
   },
   "scripts": {
     "build": "bun build src/index.ts --outfile dist/index.js --target node && bun build cli.ts --outfile dist/cli.js --target node",
