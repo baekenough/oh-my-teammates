@@ -1,0 +1,87 @@
+name: Issue Analyzer
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to analyze'
+        required: true
+        type: number
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze Issue
+    runs-on: ubuntu-latest
+    # Skip issues created by bots
+    if: ${{ !contains(github.event.issue.user.login || '', '[bot]') }}
+
+    steps:
+      - name: Check API key availability
+        id: check-secret
+        run: |
+          if [ -z "$API_KEY" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "OH_MY_CUSTOMCODE secret not set — skipping analysis"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          API_KEY: ${{ secrets.OH_MY_CUSTOMCODE }}
+
+      - name: Checkout repository
+        if: steps.check-secret.outputs.available == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        if: steps.check-secret.outputs.available == 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun dependencies
+        if: steps.check-secret.outputs.available == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.check-secret.outputs.available == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Analyze issue
+        if: steps.check-secret.outputs.available == 'true'
+        # Security: all user-supplied inputs are passed as env vars, never interpolated in run:
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.OH_MY_CUSTOMCODE }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          ISSUE_TITLE: ${{ github.event.issue.title || '' }}
+          ISSUE_BODY: ${{ github.event.issue.body || '' }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login || '' }}
+          ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
+        run: bun run .github/scripts/analyze-issue.ts "$ISSUE_NUMBER"
+
+      - name: Summary
+        if: always()
+        env:
+          SECRET_AVAILABLE: ${{ steps.check-secret.outputs.available }}
+          ISSUE_REF: ${{ github.event.issue.number || inputs.issue_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$SECRET_AVAILABLE" = "true" ]; then
+            echo "## Issue Analysis Complete" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Issue #${ISSUE_REF} analyzed in ${REPO}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Issue Analysis Skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "OH_MY_CUSTOMCODE secret not configured — set it to enable AI-powered issue analysis." >> "$GITHUB_STEP_SUMMARY"
+          fi
