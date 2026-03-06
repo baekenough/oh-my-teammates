@@ -7,7 +7,7 @@ Team collaboration addon for oh-my-customcode.
 - **Language**: TypeScript (Bun runtime)
 - **Version**: 0.1.0
 - **License**: MIT
-- **Peer Dependency**: oh-my-customcode >= 0.19.3
+- **Peer Dependency**: oh-my-customcode >= 0.18.0
 
 ## Development
 

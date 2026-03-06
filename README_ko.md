@@ -43,7 +43,7 @@ oh-my-customcode가 개인 에이전트 스택을 제공했다면, oh-my-teammat
 ## 빠른 시작
 
 ```bash
-# 설치 (oh-my-customcode >= 0.19.3 필요)
+# 설치 (oh-my-customcode >= 0.18.0 필요)
 bun add -d @oh-my-customcode/oh-my-teammates
 
 # 프로젝트에 팀 기능 초기화

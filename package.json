@@ -23,7 +23,7 @@
     "*.{ts,tsx,js,jsx}": ["bunx biome check --write"]
   },
   "peerDependencies": {
-    "oh-my-customcode": ">=0.19.3"
+    "oh-my-customcode": ">=0.18.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
