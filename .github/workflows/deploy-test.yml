@@ -33,17 +33,42 @@ jobs:
       - name: Start Verdaccio
         run: |
           npm install -g verdaccio
-          verdaccio &
+          mkdir -p /tmp/verdaccio/storage
+          cat > /tmp/verdaccio/config.yaml << 'EOF'
+          storage: /tmp/verdaccio/storage
+          auth:
+            htpasswd:
+              file: /tmp/verdaccio/htpasswd
+              max_users: -1
+          packages:
+            '@*/*':
+              access: $all
+              publish: $all
+              proxy: false
+            '**':
+              access: $all
+              publish: $all
+              proxy: false
+          log:
+            type: stdout
+            format: pretty
+            level: http
+          EOF
+          verdaccio --config /tmp/verdaccio/config.yaml &
           sleep 5
 
-      - name: Configure npm for Verdaccio
+      - name: Register test user and get token
         run: |
+          # Register a test user via Verdaccio API and capture token
+          TOKEN=$(curl -s -X PUT http://localhost:4873/-/user/org.couchdb.user:testuser \
+            -H "Content-Type: application/json" \
+            -d '{"name":"testuser","password":"testpass","email":"test@example.com","type":"user"}' \
+            | node -e "process.stdin.resume();let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).token||''))")
+          echo "//localhost:4873/:_authToken=${TOKEN}" >> ~/.npmrc
           npm config set registry http://localhost:4873/
-          npm config set //localhost:4873/:_authToken "test-token"
 
       - name: Publish to Verdaccio
-        run: |
-          npm publish --registry http://localhost:4873/
+        run: npm publish
 
       - name: Test global install
         run: |
