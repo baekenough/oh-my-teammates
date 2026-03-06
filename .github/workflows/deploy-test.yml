@@ -86,11 +86,14 @@ jobs:
           # oh-my-customcode is a peerDep not on npm yet; install with legacy-peer-deps
           npm install -g @oh-my-customcode/oh-my-teammates --registry http://localhost:4873/ --legacy-peer-deps
 
-      - name: Test omcustom-team --version
-        run: omcustom-team --version
+      - name: Test omcustom-team binary exists and runs
+        run: |
+          # Verify binary is installed and executable; CLI prints usage and exits 1 for unknown args
+          omcustom-team 2>&1 | grep -q "Usage:" && echo "CLI is functional"
 
-      - name: Test omcustom-team --help
-        run: omcustom-team --help
+      - name: Test omcustom-team todo subcommand
+        run: |
+          omcustom-team todo 2>&1 | grep -q "Usage:" && echo "todo subcommand is functional"
 
       - name: Cleanup
         if: always()
