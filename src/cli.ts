@@ -12,6 +12,11 @@ export async function runCli(args: string[]): Promise<void> {
       console.log(`Detected domains: ${result.scanResult.detectedDomains.join(', ')}`);
       console.log(`Team config: ${result.teamConfigPath}`);
       console.log(`Stewards: ${result.stewardsPath}`);
+      if (result.claudeMdResult.created) {
+        console.log(`CLAUDE.md: ${result.claudeMdPath} (created)`);
+      } else if (result.claudeMdResult.appended) {
+        console.log(`CLAUDE.md: ${result.claudeMdPath} (team section appended)`);
+      }
       break;
     }
     case 'todo': {
