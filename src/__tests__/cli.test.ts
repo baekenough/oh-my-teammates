@@ -104,6 +104,13 @@ describe('runCli', () => {
         claudeMdResult: { created: true, appended: false },
       });
 
+      // Mock promptInit to avoid blocking on stdin
+      const promptsModule = await import('../prompts');
+      const promptSpy = spyOn(promptsModule, 'promptInit').mockResolvedValue({
+        projectName: 'test-project',
+        adminUsername: '',
+      });
+
       const { runCli } = await import('../cli');
       await runCli(['init']);
 
@@ -188,10 +195,68 @@ describe('runCli', () => {
         claudeMdResult: { created: false, appended: false },
       });
 
+      // Mock promptInit to avoid blocking on stdin
+      const promptsModule = await import('../prompts');
+      const promptSpy = spyOn(promptsModule, 'promptInit').mockResolvedValue({
+        projectName: 'my-project',
+        adminUsername: '',
+      });
+
       const { runCli } = await import('../cli');
       await runCli(['init']);
 
       expect(consoleLogs.some((l) => l.includes('infrastructure'))).toBe(true);
+
+      initSpy.mockRestore();
+      promptSpy.mockRestore();
+    });
+
+    it('skips prompts when --yes flag is provided', async () => {
+      const initModule = await import('../init');
+      const initSpy = spyOn(initModule, 'initTeam').mockResolvedValue({
+        scanResult: {
+          detectedDomains: [],
+          filePatterns: {},
+          dependencies: [],
+          suggestedStewards: {},
+          analysisSkillAvailable: false,
+        },
+        teamConfigPath: '/p/team.yaml',
+        stewardsPath: '/p/STEWARDS.yaml',
+        teamDirPath: '/p/.claire/team',
+        claudeMdPath: '/p/CLAUDE.md',
+        claudeMdResult: { created: false, appended: false },
+      });
+
+      const { runCli } = await import('../cli');
+      await runCli(['init', '--yes']);
+
+      expect(consoleLogs.some((l) => l.includes('Team initialized!'))).toBe(true);
+
+      initSpy.mockRestore();
+    });
+
+    it('skips prompts when -y flag is provided', async () => {
+      const initModule = await import('../init');
+      const initSpy = spyOn(initModule, 'initTeam').mockResolvedValue({
+        scanResult: {
+          detectedDomains: [],
+          filePatterns: {},
+          dependencies: [],
+          suggestedStewards: {},
+          analysisSkillAvailable: false,
+        },
+        teamConfigPath: '/p/team.yaml',
+        stewardsPath: '/p/STEWARDS.yaml',
+        teamDirPath: '/p/.claude/team',
+        claudeMdPath: '/p/CLAUDE.md',
+        claudeMdResult: { created: false, appended: false },
+      });
+
+      const { runCli } = await import('../cli');
+      await runCli(['init', '-y']);
+
+      expect(consoleLogs.some((l) => l.includes('Team initialized!'))).toBe(true);
 
       initSpy.mockRestore();
     });
