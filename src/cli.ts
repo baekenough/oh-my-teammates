@@ -42,14 +42,10 @@ export async function runCli(args: string[]): Promise<void> {
       console.log(`Team config: ${result.teamConfigPath}`);
       console.log(`Stewards: ${result.stewardsPath}`);
 
-      const resultWithClaude = result as typeof result & {
-        claudeMdPath?: string;
-        claudeMdResult?: { created: boolean; appended: boolean };
-      };
-      if (resultWithClaude.claudeMdResult?.created) {
-        console.log(`CLAUDE.md: ${resultWithClaude.claudeMdPath} (created)`);
-      } else if (resultWithClaude.claudeMdResult?.appended) {
-        console.log(`CLAUDE.md: ${resultWithClaude.claudeMdPath} (team section appended)`);
+      if (result.claudeMdResult.created) {
+        console.log(`CLAUDE.md: ${result.claudeMdPath} (created)`);
+      } else if (result.claudeMdResult.appended) {
+        console.log(`CLAUDE.md: ${result.claudeMdPath} (team section appended)`);
       }
 
       break;

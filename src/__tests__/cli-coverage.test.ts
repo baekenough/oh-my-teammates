@@ -64,6 +64,8 @@ describe('runCli coverage', () => {
         teamConfigPath: teamYamlPath,
         stewardsPath: join(tmpDir, 'STEWARDS.yaml'),
         teamDirPath: tmpDir,
+        claudeMdPath: join(tmpDir, 'CLAUDE.md'),
+        claudeMdResult: { created: false, appended: false },
       });
 
       const promptsModule = await import('../prompts');
