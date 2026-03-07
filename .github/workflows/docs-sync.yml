@@ -1,0 +1,87 @@
+name: README Consistency Check
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'README.md'
+      - 'README_ko.md'
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'README_ko.md'
+  workflow_dispatch:
+
+jobs:
+  verify-readme-sync:
+    name: Verify README EN/KO Consistency
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Count sections in README.md and README_ko.md
+        id: count
+        run: |
+          EN_COUNT=$(grep -c "^## " README.md || echo "0")
+          KO_COUNT=$(grep -c "^## " README_ko.md || echo "0")
+
+          echo "en_count=$EN_COUNT" >> "$GITHUB_OUTPUT"
+          echo "ko_count=$KO_COUNT" >> "$GITHUB_OUTPUT"
+
+          echo "README.md sections: $EN_COUNT"
+          echo "README_ko.md sections: $KO_COUNT"
+
+      - name: Check consistency and emit warning
+        id: check
+        env:
+          EN_COUNT: ${{ steps.count.outputs.en_count }}
+          KO_COUNT: ${{ steps.count.outputs.ko_count }}
+        run: |
+          if [ "$EN_COUNT" != "$KO_COUNT" ]; then
+            echo "::warning::README section count mismatch — EN: $EN_COUNT, KO: $KO_COUNT. Please keep README.md and README_ko.md in sync."
+            echo "mismatch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Section counts match: $EN_COUNT sections in both files."
+            echo "mismatch=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate GitHub Step Summary
+        env:
+          EN_COUNT: ${{ steps.count.outputs.en_count }}
+          KO_COUNT: ${{ steps.count.outputs.ko_count }}
+          MISMATCH: ${{ steps.check.outputs.mismatch }}
+        run: |
+          {
+            echo "## README Consistency Check"
+            echo ""
+            if [ "$MISMATCH" = "true" ]; then
+              echo "### Warning: Section Count Mismatch"
+              echo ""
+              echo "| File | Section Count |"
+              echo "|------|--------------|"
+              echo "| README.md (EN) | $EN_COUNT |"
+              echo "| README_ko.md (KO) | $KO_COUNT |"
+              echo ""
+              echo "> **Action Required**: Please update both README files to keep them in sync."
+            else
+              echo "### OK: Sections Match"
+              echo ""
+              echo "| File | Section Count |"
+              echo "|------|--------------|"
+              echo "| README.md (EN) | $EN_COUNT |"
+              echo "| README_ko.md (KO) | $KO_COUNT |"
+              echo ""
+              echo "> Both README files have the same number of sections."
+            fi
+            echo ""
+            echo "### EN Sections"
+            echo '```'
+            grep "^## " README.md | sed 's/^## /- /'
+            echo '```'
+            echo ""
+            echo "### KO Sections"
+            echo '```'
+            grep "^## " README_ko.md | sed 's/^## /- /'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

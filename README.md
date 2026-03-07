@@ -43,11 +43,11 @@ Like oh-my-customcode gave you a personal agent stack, oh-my-teammates makes it 
 ## Quick Start
 
 ```bash
-# Install (requires oh-my-customcode >= 0.18.0)
+# Install (requires oh-my-customcode >= 0.19.3)
 bun add -d @oh-my-customcode/oh-my-teammates
 
 # Initialize team features on your project
-omcustom-team init
+bunx omcustom-team init
 ```
 
 ## CLI Usage
@@ -57,7 +57,7 @@ omcustom-team init
 Bootstraps team configuration for your project:
 
 ```bash
-omcustom-team init
+bunx omcustom-team init
 ```
 
 1. **Scan** your project for languages, frameworks, and file patterns
@@ -71,10 +71,10 @@ Manage team-level tasks:
 
 ```bash
 # List all team TODOs
-omcustom-team todo list
+bunx omcustom-team todo list
 
 # Add a new team task
-omcustom-team todo add Fix API rate limiting
+bunx omcustom-team todo add Fix API rate limiting
 ```
 
 ## Dashboard
@@ -142,7 +142,7 @@ Share Claude session knowledge without external infrastructure:
 
 ```bash
 # Set up selective symlinks (per developer)
-omcustom-team link
+bunx omcustom-team link
 ```
 
 ### What Gets Shared

@@ -29,7 +29,7 @@ oh-my-customcode가 개인 에이전트 스택을 제공했다면, oh-my-teammat
 | `cli.ts` | `omcustom-team init` 및 `omcustom-team todo` CLI 명령어 |
 | 대시보드 | SvelteKit 기반 에이전트/스킬/규칙/가이드 시각화, 다크모드 및 모바일 지원 |
 
-## 주요 기능
+## 기능
 
 | 기능 | 설명 |
 |------|------|
@@ -43,11 +43,11 @@ oh-my-customcode가 개인 에이전트 스택을 제공했다면, oh-my-teammat
 ## 빠른 시작
 
 ```bash
-# 설치 (oh-my-customcode >= 0.18.0 필요)
+# 설치 (oh-my-customcode >= 0.19.3 필요)
 bun add -d @oh-my-customcode/oh-my-teammates
 
 # 프로젝트에 팀 기능 초기화
-omcustom-team init
+bunx omcustom-team init
 ```
 
 ## CLI 사용법
@@ -57,7 +57,7 @@ omcustom-team init
 프로젝트의 팀 설정을 부트스트랩합니다:
 
 ```bash
-omcustom-team init
+bunx omcustom-team init
 ```
 
 1. **스캔** — 프로젝트의 언어, 프레임워크, 파일 패턴 분석
@@ -71,10 +71,10 @@ omcustom-team init
 
 ```bash
 # 모든 팀 TODO 목록 보기
-omcustom-team todo list
+bunx omcustom-team todo list
 
 # 새 팀 작업 추가
-omcustom-team todo add API 요청 제한 수정
+bunx omcustom-team todo add API 요청 제한 수정
 ```
 
 ## 대시보드
@@ -142,7 +142,7 @@ domains:
 
 ```bash
 # 선택적 심볼릭 링크 설정 (개발자별)
-omcustom-team link
+bunx omcustom-team link
 ```
 
 ### 공유 범위

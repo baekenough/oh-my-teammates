@@ -2,7 +2,7 @@
  * Project initialization
  * Analyzes existing project to recommend team configuration
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { DEFAULT_DOMAINS, Stewards } from './stewards';
 import { TeamConfig } from './team-config';
@@ -48,6 +48,8 @@ export interface ProjectScanResult {
   dependencies: string[];
   /** domain -> suggested paths that matched that domain's glob patterns */
   suggestedStewards: Record<string, string[]>;
+  /** Whether the .claude/skills/analysis/ directory is present at runtime */
+  analysisSkillAvailable: boolean;
 }
 
 // ── Directory walker ─────────────────────────────────────────────────────────
@@ -183,24 +185,103 @@ export function scanProject(rootDir = '.'): ProjectScanResult {
     }
   }
 
+  // Detect /analysis skill availability at runtime
+  const analysisSkillAvailable = existsSync(join(absRoot, '.claude', 'skills', 'analysis'));
+
   return {
     detectedDomains: Array.from(detectedDomainSet).sort(),
     filePatterns,
     dependencies,
     suggestedStewards,
+    analysisSkillAvailable,
   };
 }
 
+// ── CLAUDE.md scaffolding ─────────────────────────────────────────────────────
+
+/**
+ * Generate the "## Team Collaboration" section content for CLAUDE.md.
+ */
+function generateTeamSection(): string {
+  return `## Team Collaboration
+
+This project uses [oh-my-teammates](https://github.com/baekenough/oh-my-teammates) for team collaboration.
+
+### Team Files
+
+| File | Purpose |
+|------|---------|
+| \`team.yaml\` | Team member mapping and roles |
+| \`STEWARDS.yaml\` | Domain ownership assignments |
+| \`.claude/team/TODO.md\` | Shared team tasks |
+
+### Steward Delegation
+
+Code review assignments follow domain stewardship defined in \`STEWARDS.yaml\`.
+Each domain has a primary and backup steward for review routing.
+
+### Session Sharing
+
+Team sessions are shared via \`.claude/team/\`:
+- \`shared-memory/\` — Cross-team learnings
+- \`session-logs/\` — Session summaries
+- \`employees/\` — Per-member profiles
+
+### Guardian CI
+
+Harness integrity is validated on every PR targeting \`main\` or \`develop\`.
+Changes in \`.claude/\` trigger automated validation (~860ms).
+
+### Team TODO
+
+Team tasks are tracked in \`.claude/team/TODO.md\`.
+Use \`bunx omcustom-team todo list\` and \`bunx omcustom-team todo add\` to manage tasks.`;
+}
+
+/**
+ * Create or update `CLAUDE.md` in the given root directory with team collaboration content.
+ *
+ * - If `CLAUDE.md` does not exist: creates it with a project heading and the team section.
+ * - If `CLAUDE.md` exists but has no team section: appends the team section.
+ * - If `CLAUDE.md` already contains `## Team Collaboration`: leaves it untouched (idempotent).
+ *
+ * @returns `{ created, appended }` — exactly one will be `true` unless the file already had a team section.
+ */
+export function scaffoldClaudeMd(
+  rootDir = '.',
+  projectName = 'my-project',
+): { created: boolean; appended: boolean } {
+  const claudeMdPath = join(rootDir, 'CLAUDE.md');
+  const teamSection = generateTeamSection();
+
+  if (!existsSync(claudeMdPath)) {
+    writeFileSync(claudeMdPath, `# ${projectName}\n\n${teamSection}\n`, 'utf-8');
+    return { created: true, appended: false };
+  }
+
+  const existing = readFileSync(claudeMdPath, 'utf-8');
+  if (existing.includes('## Team Collaboration')) {
+    return { created: false, appended: false };
+  }
+
+  writeFileSync(claudeMdPath, `${existing.trimEnd()}\n\n${teamSection}\n`, 'utf-8');
+  return { created: false, appended: true };
+}
+
+// ── Team directory scaffolding ────────────────────────────────────────────────
+
 /**
  * Create the `.claude/team/` directory scaffold and a TODO.md template inside.
+ *
+ * @param analysisSkillAvailable - When true, a note about the /analysis skill is appended to TODO.md.
  */
-export function scaffoldTeamDir(rootDir = '.'): void {
+export function scaffoldTeamDir(rootDir = '.', analysisSkillAvailable = false): void {
   const teamDir = join(rootDir, '.claude', 'team');
   mkdirSync(teamDir, { recursive: true });
 
   const todoPath = join(teamDir, 'TODO.md');
   if (!existsSync(todoPath)) {
-    const template = [
+    const lines = [
       '# Team TODO',
       '',
       'Track team-related tasks here.',
@@ -210,10 +291,19 @@ export function scaffoldTeamDir(rootDir = '.'): void {
       '- [ ] Review and complete STEWARDS.yaml',
       '- [ ] Add team members to team.yaml',
       '- [ ] Configure domain ownership',
-      '',
-    ].join('\n');
+    ];
 
-    writeFileSync(todoPath, template, 'utf-8');
+    if (analysisSkillAvailable) {
+      lines.push(
+        '',
+        '## Analysis Skill',
+        '',
+        '- /analysis skill is available in .claude/skills/analysis/',
+      );
+    }
+
+    lines.push('');
+    writeFileSync(todoPath, lines.join('\n'), 'utf-8');
   }
 }
 
@@ -224,6 +314,7 @@ export function scaffoldTeamDir(rootDir = '.'): void {
  * 2. Scaffold `.claude/team/` directory with TODO.md.
  * 3. Create `team.yaml` template (if absent).
  * 4. Create `STEWARDS.yaml` draft (if absent).
+ * 5. Create or update `CLAUDE.md` with team collaboration section.
  *
  * Returns paths to the created/located files plus the scan result.
  */
@@ -232,12 +323,14 @@ export async function initTeam(rootDir = '.'): Promise<{
   teamConfigPath: string;
   stewardsPath: string;
   teamDirPath: string;
+  claudeMdPath: string;
+  claudeMdResult: { created: boolean; appended: boolean };
 }> {
   // 1. Scan project
   const scanResult = scanProject(rootDir);
 
-  // 2. Scaffold .claude/team/ directory
-  scaffoldTeamDir(rootDir);
+  // 2. Scaffold .claude/team/ directory (pass analysis skill availability)
+  scaffoldTeamDir(rootDir, scanResult.analysisSkillAvailable);
 
   // 3. Create team.yaml template if it doesn't exist
   const teamConfigPath = join(rootDir, 'team.yaml');
@@ -252,11 +345,18 @@ export async function initTeam(rootDir = '.'): Promise<{
     Stewards.createTemplate(stewardsPath);
   }
 
+  // 5. Create or update CLAUDE.md with team collaboration section
+  const projectName = detectProjectName(rootDir);
+  const claudeMdPath = join(rootDir, 'CLAUDE.md');
+  const claudeMdResult = scaffoldClaudeMd(rootDir, projectName);
+
   return {
     scanResult,
     teamConfigPath,
     stewardsPath,
     teamDirPath: join(rootDir, '.claude', 'team'),
+    claudeMdPath,
+    claudeMdResult,
   };
 }
 

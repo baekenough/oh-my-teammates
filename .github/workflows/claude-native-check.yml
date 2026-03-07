@@ -1,0 +1,333 @@
+name: Claude Native Check
+
+on:
+  schedule:
+    # Run weekly: every Sunday at 19:00 UTC (Monday 04:00 KST)
+    - cron: '0 19 * * 0'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode (no issue creation)'
+        type: boolean
+        default: false
+      force:
+        description: 'Force verification even if docs unchanged'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    name: Verify Claude Native Compliance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: "Guardrail: check CLAUDE.md exists"
+        id: guard
+        run: |
+          if [ ! -f "${{ github.workspace }}/CLAUDE.md" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=CLAUDE.md not found in project root" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Bun
+        if: steps.guard.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun dependencies
+        if: steps.guard.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Validate CLAUDE.md required sections
+        if: steps.guard.outputs.skip != 'true'
+        id: validate_claude
+        run: |
+          VIOLATIONS=""
+          CLAUDE_MD="${{ github.workspace }}/CLAUDE.md"
+
+          for section in "Project Info" "Development" "Git Workflow"; do
+            if ! grep -q "## ${section}" "$CLAUDE_MD"; then
+              VIOLATIONS="${VIOLATIONS}\n- Missing required section: '## ${section}'"
+            fi
+          done
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "has_violations=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "violations<<EOF"
+              printf "%b" "$VIOLATIONS"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "::warning::CLAUDE.md missing required sections"
+          else
+            echo "has_violations=false" >> "$GITHUB_OUTPUT"
+            echo "All required sections present in CLAUDE.md"
+          fi
+
+      - name: Validate version consistency
+        if: steps.guard.outputs.skip != 'true'
+        id: validate_version
+        run: |
+          VIOLATIONS=""
+          CLAUDE_MD="${{ github.workspace }}/CLAUDE.md"
+          PKG_JSON="${{ github.workspace }}/package.json"
+
+          if [ -f "$PKG_JSON" ]; then
+            PKG_VERSION=$(node -p "require('$PKG_JSON').version" 2>/dev/null || echo "")
+            CLAUDE_VERSION=$(grep -oP '(?<=\*\*Version\*\*: )[\d.]+' "$CLAUDE_MD" || echo "")
+
+            if [ -n "$PKG_VERSION" ] && [ -n "$CLAUDE_VERSION" ]; then
+              if [ "$PKG_VERSION" != "$CLAUDE_VERSION" ]; then
+                VIOLATIONS="${VIOLATIONS}\n- Version mismatch: package.json=${PKG_VERSION}, CLAUDE.md=${CLAUDE_VERSION}"
+              fi
+            elif [ -n "$PKG_VERSION" ] && [ -z "$CLAUDE_VERSION" ]; then
+              VIOLATIONS="${VIOLATIONS}\n- CLAUDE.md does not contain a Version entry under '## Project Info'"
+            fi
+          fi
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "has_violations=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "violations<<EOF"
+              printf "%b" "$VIOLATIONS"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "::warning::Version inconsistency detected"
+          else
+            echo "has_violations=false" >> "$GITHUB_OUTPUT"
+            echo "Version consistency check passed"
+          fi
+
+      - name: Validate README badges and links
+        if: steps.guard.outputs.skip != 'true'
+        id: validate_readme
+        run: |
+          VIOLATIONS=""
+          README="${{ github.workspace }}/README.md"
+
+          if [ ! -f "$README" ]; then
+            VIOLATIONS="${VIOLATIONS}\n- README.md not found in project root"
+          else
+            BADGE_COUNT=$(grep -cP '!\[.*?\]\(https?://[^)]+\)' "$README" || echo 0)
+            echo "Found ${BADGE_COUNT} badge(s) in README.md"
+
+            EMPTY_LINKS=$(grep -cP '\[.*?\]\(\s*\)' "$README" || echo 0)
+            if [ "$EMPTY_LINKS" -gt 0 ]; then
+              VIOLATIONS="${VIOLATIONS}\n- Found ${EMPTY_LINKS} empty link target(s) in README.md"
+            fi
+          fi
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "has_violations=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "violations<<EOF"
+              printf "%b" "$VIOLATIONS"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "::warning::README validation issues found"
+          else
+            echo "has_violations=false" >> "$GITHUB_OUTPUT"
+            echo "README validation passed"
+          fi
+
+      - name: Validate .claude/rules/ is gitignored
+        if: steps.guard.outputs.skip != 'true'
+        id: validate_gitignore
+        run: |
+          VIOLATIONS=""
+          GITIGNORE="${{ github.workspace }}/.gitignore"
+
+          if [ ! -f "$GITIGNORE" ]; then
+            VIOLATIONS="${VIOLATIONS}\n- .gitignore not found"
+          else
+            if ! grep -qE '\.claude/rules/' "$GITIGNORE"; then
+              VIOLATIONS="${VIOLATIONS}\n- .claude/rules/ is not listed in .gitignore (framework files should not be committed)"
+            fi
+          fi
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "has_violations=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "violations<<EOF"
+              printf "%b" "$VIOLATIONS"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "::warning::.gitignore validation issues found"
+          else
+            echo "has_violations=false" >> "$GITHUB_OUTPUT"
+            echo ".gitignore validation passed"
+          fi
+
+      - name: Collect all violations
+        if: steps.guard.outputs.skip != 'true'
+        id: collect
+        env:
+          CLAUDE_VIOLATIONS: ${{ steps.validate_claude.outputs.violations }}
+          VERSION_VIOLATIONS: ${{ steps.validate_version.outputs.violations }}
+          README_VIOLATIONS: ${{ steps.validate_readme.outputs.violations }}
+          GITIGNORE_VIOLATIONS: ${{ steps.validate_gitignore.outputs.violations }}
+          CLAUDE_HAS_VIOLATIONS: ${{ steps.validate_claude.outputs.has_violations }}
+          VERSION_HAS_VIOLATIONS: ${{ steps.validate_version.outputs.has_violations }}
+          README_HAS_VIOLATIONS: ${{ steps.validate_readme.outputs.has_violations }}
+          GITIGNORE_HAS_VIOLATIONS: ${{ steps.validate_gitignore.outputs.has_violations }}
+        run: |
+          ALL_VIOLATIONS=""
+
+          if [ "$CLAUDE_HAS_VIOLATIONS" = "true" ]; then
+            ALL_VIOLATIONS="${ALL_VIOLATIONS}
+          ### CLAUDE.md
+          ${CLAUDE_VIOLATIONS}"
+          fi
+          if [ "$VERSION_HAS_VIOLATIONS" = "true" ]; then
+            ALL_VIOLATIONS="${ALL_VIOLATIONS}
+          ### Version Consistency
+          ${VERSION_VIOLATIONS}"
+          fi
+          if [ "$README_HAS_VIOLATIONS" = "true" ]; then
+            ALL_VIOLATIONS="${ALL_VIOLATIONS}
+          ### README
+          ${README_VIOLATIONS}"
+          fi
+          if [ "$GITIGNORE_HAS_VIOLATIONS" = "true" ]; then
+            ALL_VIOLATIONS="${ALL_VIOLATIONS}
+          ### .gitignore
+          ${GITIGNORE_VIOLATIONS}"
+          fi
+
+          if [ -n "$ALL_VIOLATIONS" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "body<<EOF"
+              echo "$ALL_VIOLATIONS"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create issue on violations
+        if: >
+          steps.guard.outputs.skip != 'true' &&
+          steps.collect.outputs.found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          OH_MY_CUSTOMCODE: ${{ secrets.OH_MY_CUSTOMCODE }}
+          DRY_RUN_INPUT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+          VIOLATION_BODY: ${{ steps.collect.outputs.body }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          if [ "$DRY_RUN_INPUT" = "true" ]; then
+            echo "Dry run mode: skipping issue creation"
+            echo "Would have created issue with violations:"
+            echo "$VIOLATION_BODY"
+            exit 0
+          fi
+
+          ISSUE_TITLE="[Claude Native Check] Compliance violations detected - $(date +%Y-%m-%d)"
+          ISSUE_BODY="## Claude Native Compliance Violations
+
+          Automated weekly check detected the following issues:
+
+          ${VIOLATION_BODY}
+
+          ---
+          *Generated by [Claude Native Check](${SERVER_URL}/${REPO}/actions/runs/${RUN_ID}) workflow*"
+
+          gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY" \
+            --label "compliance,automated" \
+            --repo "$REPO" 2>/dev/null || \
+          gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY" \
+            --repo "$REPO"
+
+      - name: Create summary
+        if: always()
+        env:
+          DRY_RUN_INPUT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+          FORCE_INPUT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force == 'true' && 'true' || 'false' }}
+          GUARD_SKIP: ${{ steps.guard.outputs.skip }}
+          GUARD_REASON: ${{ steps.guard.outputs.reason }}
+          CLAUDE_HAS_VIOLATIONS: ${{ steps.validate_claude.outputs.has_violations }}
+          VERSION_HAS_VIOLATIONS: ${{ steps.validate_version.outputs.has_violations }}
+          README_HAS_VIOLATIONS: ${{ steps.validate_readme.outputs.has_violations }}
+          GITIGNORE_HAS_VIOLATIONS: ${{ steps.validate_gitignore.outputs.has_violations }}
+          VIOLATIONS_FOUND: ${{ steps.collect.outputs.found }}
+          VIOLATION_BODY: ${{ steps.collect.outputs.body }}
+        run: |
+          if [ "$GUARD_SKIP" = "true" ]; then
+            echo "## Claude Native Verification Skipped" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Reason: ${GUARD_REASON}" >> $GITHUB_STEP_SUMMARY
+            echo "This workflow requires CLAUDE.md in the project root." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          echo "## Claude Native Verification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Weekly compliance check for oh-my-teammates project." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Project Root**: \`/\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${DRY_RUN_INPUT:-false}" = "true" ]; then
+            echo "**Mode**: Dry Run (no issue creation)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          check_result() {
+            local name="$1"
+            local has_violations="$2"
+            if [ "$has_violations" = "true" ]; then
+              echo "- FAIL ${name}" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- PASS ${name}" >> $GITHUB_STEP_SUMMARY
+            fi
+          }
+
+          check_result "CLAUDE.md required sections" "$CLAUDE_HAS_VIOLATIONS"
+          check_result "Version consistency (package.json <-> CLAUDE.md)" "$VERSION_HAS_VIOLATIONS"
+          check_result "README.md badges and links" "$README_HAS_VIOLATIONS"
+          check_result ".claude/rules/ in .gitignore" "$GITIGNORE_HAS_VIOLATIONS"
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$VIOLATIONS_FOUND" = "true" ]; then
+            echo "### Violations Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "$VIOLATION_BODY" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            if [ "${DRY_RUN_INPUT:-false}" != "true" ]; then
+              echo "A GitHub issue has been created with the details above." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "All checks passed. No violations detected." >> $GITHUB_STEP_SUMMARY
+          fi
