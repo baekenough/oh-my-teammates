@@ -1,5 +1,5 @@
-export { TeamConfig } from './team-config';
 export { SessionLogger } from './session-logger';
 export { Stewards } from './stewards';
-export { TeamTodo } from './team-todo';
+export { TeamConfig } from './team-config';
 export type { TodoItem } from './team-todo';
+export { TeamTodo } from './team-todo';

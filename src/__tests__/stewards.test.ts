@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { DEFAULT_DOMAINS, Stewards } from '../stewards';
 import type { DomainSteward } from '../stewards';
+import { DEFAULT_DOMAINS, Stewards } from '../stewards';
 
 // ---------------------------------------------------------------------------
 // Helpers

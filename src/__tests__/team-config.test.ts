@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
-import { TeamConfig } from '../team-config';
 import type { TeamConfigData, TeamMember } from '../team-config';
+import { TeamConfig } from '../team-config';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
