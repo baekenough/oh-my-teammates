@@ -100,6 +100,8 @@ describe('runCli', () => {
         teamConfigPath: '/fake/team.yaml',
         stewardsPath: '/fake/STEWARDS.yaml',
         teamDirPath: '/fake/.claude/team',
+        claudeMdPath: '/fake/CLAUDE.md',
+        claudeMdResult: { created: true, appended: false },
       });
 
       const { runCli } = await import('../cli');
@@ -109,6 +111,62 @@ describe('runCli', () => {
       expect(consoleLogs.some((l) => l.includes('backend') && l.includes('frontend'))).toBe(true);
       expect(consoleLogs.some((l) => l.includes('/fake/team.yaml'))).toBe(true);
       expect(consoleLogs.some((l) => l.includes('/fake/STEWARDS.yaml'))).toBe(true);
+
+      expect(consoleLogs.some((l) => l.includes('/fake/CLAUDE.md') && l.includes('created'))).toBe(
+        true,
+      );
+
+      initSpy.mockRestore();
+    });
+
+    it('prints CLAUDE.md appended message when team section was appended', async () => {
+      const initModule = await import('../init');
+      const initSpy = spyOn(initModule, 'initTeam').mockResolvedValue({
+        scanResult: {
+          detectedDomains: [],
+          filePatterns: {},
+          dependencies: [],
+          suggestedStewards: {},
+          analysisSkillAvailable: false,
+        },
+        teamConfigPath: '/p/team.yaml',
+        stewardsPath: '/p/STEWARDS.yaml',
+        teamDirPath: '/p/.claude/team',
+        claudeMdPath: '/p/CLAUDE.md',
+        claudeMdResult: { created: false, appended: true },
+      });
+
+      const { runCli } = await import('../cli');
+      await runCli(['init']);
+
+      expect(
+        consoleLogs.some((l) => l.includes('/p/CLAUDE.md') && l.includes('team section appended')),
+      ).toBe(true);
+
+      initSpy.mockRestore();
+    });
+
+    it('does not print CLAUDE.md message when file already had team section', async () => {
+      const initModule = await import('../init');
+      const initSpy = spyOn(initModule, 'initTeam').mockResolvedValue({
+        scanResult: {
+          detectedDomains: [],
+          filePatterns: {},
+          dependencies: [],
+          suggestedStewards: {},
+          analysisSkillAvailable: false,
+        },
+        teamConfigPath: '/p/team.yaml',
+        stewardsPath: '/p/STEWARDS.yaml',
+        teamDirPath: '/p/.claude/team',
+        claudeMdPath: '/p/CLAUDE.md',
+        claudeMdResult: { created: false, appended: false },
+      });
+
+      const { runCli } = await import('../cli');
+      await runCli(['init']);
+
+      expect(consoleLogs.some((l) => l.includes('CLAUDE.md:'))).toBe(false);
 
       initSpy.mockRestore();
     });
@@ -126,6 +184,8 @@ describe('runCli', () => {
         teamConfigPath: '/p/team.yaml',
         stewardsPath: '/p/STEWARDS.yaml',
         teamDirPath: '/p/.claude/team',
+        claudeMdPath: '/p/CLAUDE.md',
+        claudeMdResult: { created: false, appended: false },
       });
 
       const { runCli } = await import('../cli');

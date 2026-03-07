@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { detectProjectName, initTeam, scaffoldTeamDir, scanProject } from '../init';
+import {
+  detectProjectName,
+  initTeam,
+  scaffoldClaudeMd,
+  scaffoldTeamDir,
+  scanProject,
+} from '../init';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -397,5 +403,97 @@ describe('initTeam', () => {
 
     const content = readFileSync(join(tmpDir, 'team.yaml'), 'utf-8');
     expect(content).toContain('cool-project');
+  });
+
+  it('returns claudeMdPath in result', async () => {
+    const result = await initTeam(tmpDir);
+    expect(result.claudeMdPath).toBe(join(tmpDir, 'CLAUDE.md'));
+  });
+
+  it('returns claudeMdResult in result', async () => {
+    const result = await initTeam(tmpDir);
+    expect(typeof result.claudeMdResult.created).toBe('boolean');
+    expect(typeof result.claudeMdResult.appended).toBe('boolean');
+  });
+
+  it('creates CLAUDE.md after initTeam', async () => {
+    await initTeam(tmpDir);
+    expect(existsSync(join(tmpDir, 'CLAUDE.md'))).toBe(true);
+  });
+});
+
+// ── scaffoldClaudeMd ──────────────────────────────────────────────────────────
+
+describe('scaffoldClaudeMd', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  it('creates CLAUDE.md when it does not exist', () => {
+    scaffoldClaudeMd(tmpDir, 'my-project');
+    expect(existsSync(join(tmpDir, 'CLAUDE.md'))).toBe(true);
+  });
+
+  it('created file contains ## Team Collaboration', () => {
+    scaffoldClaudeMd(tmpDir, 'my-project');
+    const content = readFileSync(join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    expect(content).toContain('## Team Collaboration');
+  });
+
+  it('created file contains the project name', () => {
+    scaffoldClaudeMd(tmpDir, 'awesome-project');
+    const content = readFileSync(join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    expect(content).toContain('awesome-project');
+  });
+
+  it('appends team section to existing CLAUDE.md without a team section', () => {
+    writeFileSync(join(tmpDir, 'CLAUDE.md'), '# Existing Project\n\nSome content.\n', 'utf-8');
+    scaffoldClaudeMd(tmpDir, 'my-project');
+    const content = readFileSync(join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    expect(content).toContain('## Team Collaboration');
+  });
+
+  it('preserves existing content when appending', () => {
+    const original = '# Existing Project\n\nSome content.\n';
+    writeFileSync(join(tmpDir, 'CLAUDE.md'), original, 'utf-8');
+    scaffoldClaudeMd(tmpDir, 'my-project');
+    const content = readFileSync(join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    expect(content).toContain('# Existing Project');
+    expect(content).toContain('Some content.');
+  });
+
+  it('does not modify CLAUDE.md that already has a team section', () => {
+    const original = '# Project\n\n## Team Collaboration\n\nAlready here.\n';
+    writeFileSync(join(tmpDir, 'CLAUDE.md'), original, 'utf-8');
+    scaffoldClaudeMd(tmpDir, 'my-project');
+    const content = readFileSync(join(tmpDir, 'CLAUDE.md'), 'utf-8');
+    expect(content).toBe(original);
+  });
+
+  it('returns { created: true, appended: false } when creating new file', () => {
+    const result = scaffoldClaudeMd(tmpDir, 'my-project');
+    expect(result).toEqual({ created: true, appended: false });
+  });
+
+  it('returns { created: false, appended: true } when appending to existing file', () => {
+    writeFileSync(join(tmpDir, 'CLAUDE.md'), '# Existing\n', 'utf-8');
+    const result = scaffoldClaudeMd(tmpDir, 'my-project');
+    expect(result).toEqual({ created: false, appended: true });
+  });
+
+  it('returns { created: false, appended: false } when team section already exists', () => {
+    writeFileSync(
+      join(tmpDir, 'CLAUDE.md'),
+      '# Project\n\n## Team Collaboration\n\nAlready here.\n',
+      'utf-8',
+    );
+    const result = scaffoldClaudeMd(tmpDir, 'my-project');
+    expect(result).toEqual({ created: false, appended: false });
   });
 });
