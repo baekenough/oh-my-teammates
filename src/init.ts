@@ -2,7 +2,7 @@
  * Project initialization
  * Analyzes existing project to recommend team configuration
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { DEFAULT_DOMAINS, Stewards } from './stewards';
 import { TeamConfig } from './team-config';

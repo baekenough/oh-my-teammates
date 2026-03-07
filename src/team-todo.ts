@@ -129,11 +129,7 @@ export class TeamTodo {
   }
 
   /** Return items, optionally filtered by scope, priority, or assignee. */
-  list(filter?: {
-    scope?: 'team' | 'personal';
-    priority?: string;
-    assignee?: string;
-  }): TodoItem[] {
+  list(filter?: { scope?: 'team' | 'personal'; priority?: string; assignee?: string }): TodoItem[] {
     if (!filter) {
       return [...this.items];
     }
