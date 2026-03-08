@@ -18,7 +18,7 @@ export interface SessionEvent {
   id: number;
   sessionId: string;
   timestamp: string; // ISO 8601
-  type: 'file_change' | 'command' | 'agent_spawn' | 'error' | 'note';
+  type: 'file_change' | 'command' | 'agent_spawn' | 'agent_start' | 'agent_stop' | 'error' | 'note';
   data: string; // JSON string
 }
 
