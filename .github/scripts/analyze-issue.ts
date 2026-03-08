@@ -55,7 +55,7 @@ const PROJECT_CONTEXT =
   'It manages organizational harnesses (agent configurations) for Claude Code AI agent teams. ' +
   'Key features: harness management (add/remove/list), team configuration, GitHub Actions workflows. ' +
   'Tech: TypeScript, Bun runtime, YAML parsing, GitHub Actions, npm. ' +
-  'Peer dependency: oh-my-customcode >= 0.18.0.';
+  'Peer dependency: oh-my-customcode >= 0.23.0.';
 
 // ============================================================================
 // Helper Functions
