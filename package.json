@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-customcode/oh-my-teammates",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Team collaboration addon for oh-my-customcode - organizational harness management",
   "type": "module",
   "main": "dist/index.js",
@@ -31,14 +31,15 @@
     ]
   },
   "peerDependencies": {
-    "oh-my-customcode": ">=0.19.3"
+    "oh-my-customcode": ">=0.23.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
     "@types/node": "^25.3.3",
     "bun-types": "^1.3.10",
     "husky": "^9.1.7",
-    "lint-staged": "^16.3.2"
+    "lint-staged": "^16.3.2",
+    "oh-my-customcode": "^0.23.0"
   },
   "dependencies": {
     "yaml": "^2.7.0"

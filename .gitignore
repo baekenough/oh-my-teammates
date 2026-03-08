@@ -32,3 +32,6 @@ dashboard/
 
 # Backup files
 *.bak
+.omcustom-backup-*/
+package-lock.json
+.claude/*.sh

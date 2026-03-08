@@ -214,13 +214,9 @@ describe('SessionLogger', () => {
 
     it('supports all valid event types', () => {
       const sessionId = logger.startSession('carol', 'main');
-      const types: Array<'file_change' | 'command' | 'agent_spawn' | 'error' | 'note'> = [
-        'file_change',
-        'command',
-        'agent_spawn',
-        'error',
-        'note',
-      ];
+      const types: Array<
+        'file_change' | 'command' | 'agent_spawn' | 'agent_start' | 'agent_stop' | 'error' | 'note'
+      > = ['file_change', 'command', 'agent_spawn', 'agent_start', 'agent_stop', 'error', 'note'];
       for (const type of types) {
         logger.logEvent(type, {});
       }
