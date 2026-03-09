@@ -142,9 +142,12 @@ export class ReportGenerator {
   }
 
   private summarizeTodos(items: TodoItem[]): ReportData['todos'] {
-    const completed = items.filter((i) => i.completed).length;
+    let completed = 0;
     const byPriority: Record<string, number> = {};
     for (const item of items) {
+      if (item.completed) {
+        completed++;
+      }
       byPriority[item.priority] = (byPriority[item.priority] ?? 0) + 1;
     }
     return {
