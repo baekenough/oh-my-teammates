@@ -58,14 +58,18 @@ describe('runCli', () => {
     it('prints usage and exits with code 1 for unknown command', async () => {
       const { runCli } = await import('../cli');
       await expect(runCli(['unknown-command'])).rejects.toThrow('process.exit(1)');
-      expect(consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo]'))).toBe(true);
+      expect(
+        consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo|report|recommend]')),
+      ).toBe(true);
       expect(processExitCode).toBe(1);
     });
 
     it('prints usage and exits with code 1 for empty args', async () => {
       const { runCli } = await import('../cli');
       await expect(runCli([])).rejects.toThrow('process.exit(1)');
-      expect(consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo]'))).toBe(true);
+      expect(
+        consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo|report|recommend]')),
+      ).toBe(true);
       expect(processExitCode).toBe(1);
     });
   });
@@ -106,7 +110,7 @@ describe('runCli', () => {
 
       // Mock promptInit to avoid blocking on stdin
       const promptsModule = await import('../prompts');
-      const promptSpy = spyOn(promptsModule, 'promptInit').mockResolvedValue({
+      const _promptSpy = spyOn(promptsModule, 'promptInit').mockResolvedValue({
         projectName: 'test-project',
         adminUsername: '',
       });
@@ -474,6 +478,232 @@ describe('runCli', () => {
       const { runCli } = await import('../cli');
       await expect(runCli(['todo'])).rejects.toThrow('process.exit(1)');
       expect(processExitCode).toBe(1);
+    });
+  });
+
+  // ── report command ────────────────────────────────────────────────────────
+
+  describe('report command', () => {
+    it('generates report and prints output path', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/fake/report.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report']);
+
+      expect(consoleLogs.some((l) => l.includes('/fake/report.html'))).toBe(true);
+      expect(reportSpy).toHaveBeenCalledWith({ output: undefined, days: undefined, open: false });
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes --output flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/custom/out.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '--output', 'custom/out.html']);
+
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ output: 'custom/out.html' }),
+      );
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes -o short flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/short/out.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '-o', 'short/out.html']);
+
+      expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ output: 'short/out.html' }));
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes --days flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/fake/report.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '--days', '7']);
+
+      expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ days: 7 }));
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes --open flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/fake/report.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '--open']);
+
+      expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ open: true }));
+
+      reportSpy.mockRestore();
+    });
+  });
+
+  // ── recommend command ─────────────────────────────────────────────────────
+
+  describe('recommend command', () => {
+    it('prints text output with recommendations when found', async () => {
+      const recommenderModule = await import('../recommender');
+      const recommendSpy = spyOn(
+        recommenderModule.Recommender.prototype,
+        'recommend',
+      ).mockReturnValue([
+        {
+          agent: 'lang-typescript-expert',
+          category: 'language',
+          description: 'TypeScript development',
+          confidence: 0.9,
+          reasons: ['tsconfig.json found'],
+        },
+        {
+          agent: 'infra-docker-expert',
+          category: 'infrastructure',
+          description: 'Docker containerization',
+          confidence: 0.5,
+          reasons: ['Dockerfile found'],
+        },
+      ]);
+
+      const { runCli } = await import('../cli');
+      await runCli(['recommend']);
+
+      expect(consoleLogs.some((l) => l.includes('Project Tech Stack Analysis'))).toBe(true);
+      // High confidence (>=70%) uses *
+      expect(consoleLogs.some((l) => l.includes('*') && l.includes('lang-typescript-expert'))).toBe(
+        true,
+      );
+      // Medium confidence (30-69%) uses .
+      expect(consoleLogs.some((l) => l.includes('.') && l.includes('infra-docker-expert'))).toBe(
+        true,
+      );
+      expect(consoleLogs.some((l) => l.includes('* High confidence'))).toBe(true);
+
+      recommendSpy.mockRestore();
+    });
+
+    it('prints "No agent recommendations found." when list is empty', async () => {
+      const recommenderModule = await import('../recommender');
+      const recommendSpy = spyOn(
+        recommenderModule.Recommender.prototype,
+        'recommend',
+      ).mockReturnValue([]);
+
+      const { runCli } = await import('../cli');
+      await runCli(['recommend']);
+
+      expect(consoleLogs.some((l) => l.includes('No agent recommendations found.'))).toBe(true);
+
+      recommendSpy.mockRestore();
+    });
+
+    it('outputs JSON when --json flag is provided', async () => {
+      const recommenderModule = await import('../recommender');
+      const mockRecs = [
+        {
+          agent: 'lang-typescript-expert',
+          category: 'language' as const,
+          description: 'TypeScript development',
+          confidence: 0.9,
+          reasons: ['tsconfig.json found'],
+        },
+      ];
+      const recommendSpy = spyOn(
+        recommenderModule.Recommender.prototype,
+        'recommend',
+      ).mockReturnValue(mockRecs);
+
+      const { runCli } = await import('../cli');
+      await runCli(['recommend', '--json']);
+
+      const jsonLine = consoleLogs.find((l) => {
+        try {
+          JSON.parse(l);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      expect(jsonLine).toBeDefined();
+      const parsed = JSON.parse(jsonLine ?? '[]');
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed[0].agent).toBe('lang-typescript-expert');
+
+      recommendSpy.mockRestore();
+    });
+
+    it('shows reasons when --verbose flag is provided', async () => {
+      const recommenderModule = await import('../recommender');
+      const recommendSpy = spyOn(
+        recommenderModule.Recommender.prototype,
+        'recommend',
+      ).mockReturnValue([
+        {
+          agent: 'lang-typescript-expert',
+          category: 'language',
+          description: 'TypeScript development',
+          confidence: 0.9,
+          reasons: ['tsconfig.json found', '5 .ts files found'],
+        },
+      ]);
+
+      const { runCli } = await import('../cli');
+      await runCli(['recommend', '--verbose']);
+
+      expect(consoleLogs.some((l) => l.includes('tsconfig.json found'))).toBe(true);
+      expect(consoleLogs.some((l) => l.includes('.ts files found'))).toBe(true);
+
+      recommendSpy.mockRestore();
+    });
+
+    it('passes minConfidence option when --min-confidence flag is provided', async () => {
+      const recommenderModule = await import('../recommender');
+      const recommendSpy = spyOn(
+        recommenderModule.Recommender.prototype,
+        'recommend',
+      ).mockReturnValue([]);
+
+      const { runCli } = await import('../cli');
+      await runCli(['recommend', '--min-confidence', '0.7']);
+
+      expect(recommendSpy).toHaveBeenCalledWith(expect.objectContaining({ minConfidence: 0.7 }));
+
+      recommendSpy.mockRestore();
+    });
+
+    it('passes category option when --category flag is provided', async () => {
+      const recommenderModule = await import('../recommender');
+      const recommendSpy = spyOn(
+        recommenderModule.Recommender.prototype,
+        'recommend',
+      ).mockReturnValue([]);
+
+      const { runCli } = await import('../cli');
+      await runCli(['recommend', '--category', 'infrastructure']);
+
+      expect(recommendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'infrastructure' }),
+      );
+
+      recommendSpy.mockRestore();
     });
   });
 

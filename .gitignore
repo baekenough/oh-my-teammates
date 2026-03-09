@@ -24,8 +24,10 @@ guides/
 .omcustomrc.json
 .omcustom-customizations.json
 
-# Dashboard (for target projects, not this repo)
-dashboard/
+# Dashboard build artifacts (source is tracked)
+dashboard/node_modules/
+dashboard/.svelte-kit/
+dashboard/build/
 
 # Root placeholder (replaced by src/index.ts)
 /index.ts
