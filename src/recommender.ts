@@ -25,7 +25,7 @@ export interface RecommendOptions {
 
 interface ScanResult {
   extensions: Record<string, number>;
-  configFiles: string[];
+  filenames: string[];
   directories: string[];
 }
 
@@ -101,7 +101,7 @@ export class Recommender {
 
   private scanFiles(): ScanResult {
     const extensions: Record<string, number> = {};
-    const configFiles: string[] = [];
+    const filenames: string[] = [];
     const directories: string[] = [];
 
     const walk = (dir: string, depth: number): void => {
@@ -135,13 +135,13 @@ export class Recommender {
           if (ext) {
             extensions[ext] = (extensions[ext] ?? 0) + 1;
           }
-          configFiles.push(basename(name));
+          filenames.push(basename(name));
         }
       }
     };
 
     walk(this.basePath, 0);
-    return { extensions, configFiles, directories };
+    return { extensions, filenames, directories };
   }
 
   // ── Private: manifest parsing ─────────────────────────────────────────────
@@ -166,7 +166,7 @@ export class Recommender {
 
       try {
         const parsed = parseManifest(filename, content);
-        if (parsed !== null && parsed !== undefined) {
+        if (parsed !== null) {
           results.push(parsed);
         }
       } catch {
@@ -211,7 +211,7 @@ export class Recommender {
     // Layer 2: Config files
     if (entry.detection.configFiles !== undefined) {
       for (const config of entry.detection.configFiles) {
-        if (scan.configFiles.includes(config)) {
+        if (scan.filenames.includes(config)) {
           const score = 0.8;
           if (score > maxConfidence) {
             maxConfidence = score;

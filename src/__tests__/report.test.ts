@@ -314,6 +314,7 @@ describe('generateReportHtml', () => {
     return {
       generatedAt: '2025-01-01T12:00:00.000Z',
       teamName: 'Test Team',
+      version: '0.4.5',
       memberCount: 2,
       domainCount: 2,
       members: [
