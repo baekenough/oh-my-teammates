@@ -3,11 +3,7 @@
  * Aggregates data from all sources and produces a static HTML report
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
-
-const PKG_VERSION = (createRequire(import.meta.url)('../package.json') as { version: string })
-  .version;
 
 import type { ReportData } from './report-template';
 import { generateReportHtml } from './report-template';
@@ -53,7 +49,6 @@ export class ReportGenerator {
     const reportData: ReportData = {
       generatedAt: new Date().toISOString(),
       teamName,
-      version: PKG_VERSION,
       memberCount: members.length,
       domainCount: Object.keys(domains).length,
       members,
