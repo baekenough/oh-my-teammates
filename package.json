@@ -27,7 +27,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
-      "bunx biome check --write"
+      "bunx biome check --write --no-errors-on-unmatched"
     ]
   },
   "peerDependencies": {
