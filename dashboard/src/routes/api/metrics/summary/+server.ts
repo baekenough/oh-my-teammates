@@ -2,7 +2,6 @@ import { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
 
 const DB_PATH =
   process.env.SESSIONS_DB_PATH || resolve(process.cwd(), '..', '.claude/team/sessions.db');
@@ -36,7 +35,7 @@ interface MetricsRow {
   errorRate: number | null;
 }
 
-export const GET: RequestHandler = async ({ url }) => {
+export async function GET({ url }: { url: URL }): Promise<Response> {
   if (!existsSync(DB_PATH)) {
     return json({
       totalSessions: 0,
@@ -150,4 +149,4 @@ export const GET: RequestHandler = async ({ url }) => {
   } finally {
     db.close();
   }
-};
+}

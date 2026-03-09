@@ -2,7 +2,6 @@ import { Database } from 'bun:sqlite';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { error, json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
 
 const DB_PATH =
   process.env.SESSIONS_DB_PATH || resolve(process.cwd(), '..', '.claude/team/sessions.db');
@@ -24,8 +23,12 @@ interface SessionEvent {
   data: string;
 }
 
-export const GET: RequestHandler = async ({ params }) => {
-  const { id } = params;
+export async function GET({ params }: { params: Record<string, string> }): Promise<Response> {
+  const id = params.id;
+
+  if (!id) {
+    throw error(400, 'Missing session id');
+  }
 
   if (!existsSync(DB_PATH)) {
     throw error(404, 'Session not found');
@@ -56,4 +59,4 @@ export const GET: RequestHandler = async ({ params }) => {
   } finally {
     db.close();
   }
-};
+}
