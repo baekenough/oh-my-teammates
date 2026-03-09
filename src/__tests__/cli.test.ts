@@ -58,14 +58,18 @@ describe('runCli', () => {
     it('prints usage and exits with code 1 for unknown command', async () => {
       const { runCli } = await import('../cli');
       await expect(runCli(['unknown-command'])).rejects.toThrow('process.exit(1)');
-      expect(consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo]'))).toBe(true);
+      expect(consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo|report]'))).toBe(
+        true,
+      );
       expect(processExitCode).toBe(1);
     });
 
     it('prints usage and exits with code 1 for empty args', async () => {
       const { runCli } = await import('../cli');
       await expect(runCli([])).rejects.toThrow('process.exit(1)');
-      expect(consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo]'))).toBe(true);
+      expect(consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo|report]'))).toBe(
+        true,
+      );
       expect(processExitCode).toBe(1);
     });
   });
@@ -474,6 +478,83 @@ describe('runCli', () => {
       const { runCli } = await import('../cli');
       await expect(runCli(['todo'])).rejects.toThrow('process.exit(1)');
       expect(processExitCode).toBe(1);
+    });
+  });
+
+  // ── report command ────────────────────────────────────────────────────────
+
+  describe('report command', () => {
+    it('generates report and prints output path', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/fake/report.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report']);
+
+      expect(consoleLogs.some((l) => l.includes('/fake/report.html'))).toBe(true);
+      expect(reportSpy).toHaveBeenCalledWith({ output: undefined, days: undefined, open: false });
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes --output flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/custom/out.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '--output', 'custom/out.html']);
+
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ output: 'custom/out.html' }),
+      );
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes -o short flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/short/out.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '-o', 'short/out.html']);
+
+      expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ output: 'short/out.html' }));
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes --days flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/fake/report.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '--days', '7']);
+
+      expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ days: 7 }));
+
+      reportSpy.mockRestore();
+    });
+
+    it('passes --open flag to generator', async () => {
+      const reportModule = await import('../report');
+      const reportSpy = spyOn(reportModule.ReportGenerator.prototype, 'generate').mockResolvedValue(
+        '/fake/report.html',
+      );
+
+      const { runCli } = await import('../cli');
+      await runCli(['report', '--open']);
+
+      expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ open: true }));
+
+      reportSpy.mockRestore();
     });
   });
 

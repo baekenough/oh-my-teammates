@@ -22,6 +22,29 @@ export interface SessionEvent {
   data: string; // JSON string
 }
 
+export interface SessionStats {
+  totalSessions: number;
+  uniqueUsers: number;
+  avgDurationMinutes: number;
+  totalDurationMinutes: number;
+}
+
+export interface EventTypeCount {
+  type: string;
+  count: number;
+}
+
+export interface UserActivity {
+  user: string;
+  sessionCount: number;
+  totalMinutes: number;
+}
+
+export interface BranchCount {
+  branch: string;
+  count: number;
+}
+
 export class SessionLogger {
   private db: Database;
   private currentSession: string | null = null;
@@ -215,6 +238,129 @@ export class SessionLogger {
       timestamp: row.timestamp,
       type: row.type as SessionEvent['type'],
       data: row.data,
+    }));
+  }
+
+  getSessionStats(days?: number): SessionStats {
+    const whereClause =
+      days !== undefined ? `WHERE started_at >= datetime('now', '-' || ${days} || ' days')` : '';
+
+    const row = this.db
+      .prepare<
+        {
+          total_sessions: number;
+          unique_users: number;
+          avg_duration_minutes: number | null;
+          total_duration_minutes: number | null;
+        },
+        []
+      >(
+        `SELECT
+           COUNT(*) AS total_sessions,
+           COUNT(DISTINCT user) AS unique_users,
+           AVG(
+             CASE WHEN ended_at IS NOT NULL
+               THEN (julianday(ended_at) - julianday(started_at)) * 1440
+             END
+           ) AS avg_duration_minutes,
+           SUM(
+             CASE WHEN ended_at IS NOT NULL
+               THEN (julianday(ended_at) - julianday(started_at)) * 1440
+             END
+           ) AS total_duration_minutes
+         FROM sessions ${whereClause}`,
+      )
+      .get();
+
+    return {
+      totalSessions: row?.total_sessions ?? 0,
+      uniqueUsers: row?.unique_users ?? 0,
+      avgDurationMinutes: row?.avg_duration_minutes ?? 0,
+      totalDurationMinutes: row?.total_duration_minutes ?? 0,
+    };
+  }
+
+  getEventStats(days?: number): EventTypeCount[] {
+    const whereClause =
+      days !== undefined ? `WHERE timestamp >= datetime('now', '-' || ${days} || ' days')` : '';
+
+    const rows = this.db
+      .prepare<
+        {
+          type: string;
+          count: number;
+        },
+        []
+      >(
+        `SELECT type, COUNT(*) AS count
+         FROM session_events ${whereClause}
+         GROUP BY type
+         ORDER BY count DESC`,
+      )
+      .all();
+
+    return rows.map((row) => ({
+      type: row.type,
+      count: row.count,
+    }));
+  }
+
+  getActiveUsers(days?: number): UserActivity[] {
+    const whereClause =
+      days !== undefined ? `WHERE started_at >= datetime('now', '-' || ${days} || ' days')` : '';
+
+    const rows = this.db
+      .prepare<
+        {
+          user: string;
+          session_count: number;
+          total_minutes: number | null;
+        },
+        []
+      >(
+        `SELECT
+           user,
+           COUNT(*) AS session_count,
+           SUM(
+             CASE WHEN ended_at IS NOT NULL
+               THEN (julianday(ended_at) - julianday(started_at)) * 1440
+             END
+           ) AS total_minutes
+         FROM sessions ${whereClause}
+         GROUP BY user
+         ORDER BY session_count DESC`,
+      )
+      .all();
+
+    return rows.map((row) => ({
+      user: row.user,
+      sessionCount: row.session_count,
+      totalMinutes: row.total_minutes ?? 0,
+    }));
+  }
+
+  getBranchDistribution(days?: number): BranchCount[] {
+    const whereClause =
+      days !== undefined ? `WHERE started_at >= datetime('now', '-' || ${days} || ' days')` : '';
+
+    const rows = this.db
+      .prepare<
+        {
+          branch: string;
+          count: number;
+        },
+        []
+      >(
+        `SELECT branch, COUNT(*) AS count
+         FROM sessions ${whereClause}
+         GROUP BY branch
+         ORDER BY count DESC`,
+      )
+      .all();
+
+    return rows.map((row) => ({
+      branch: row.branch,
+      count: row.count,
     }));
   }
 

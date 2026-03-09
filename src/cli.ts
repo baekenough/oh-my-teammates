@@ -99,12 +99,40 @@ export async function runCli(args: string[]): Promise<void> {
       }
       break;
     }
+    case 'report': {
+      const { ReportGenerator } = await import('./report');
+      const generator = new ReportGenerator();
+
+      // Parse options
+      const outputIdx =
+        args.indexOf('--output') !== -1 ? args.indexOf('--output') : args.indexOf('-o');
+      const output = outputIdx !== -1 ? args[outputIdx + 1] : undefined;
+
+      const daysIdx = args.indexOf('--days') !== -1 ? args.indexOf('--days') : args.indexOf('-d');
+      const days = daysIdx !== -1 ? Number.parseInt(args[daysIdx + 1] ?? '', 10) : undefined;
+
+      const open = args.includes('--open');
+
+      const outputPath = await generator.generate({
+        output,
+        days: days && !Number.isNaN(days) ? days : undefined,
+        open,
+      });
+      console.log(`Report generated: ${outputPath}`);
+      break;
+    }
     default: {
-      console.log('Usage: omcustom-team [init|todo]');
+      console.log('Usage: omcustom-team [init|todo|report]');
       console.log('');
       console.log('Commands:');
       console.log('  init [--yes|-y]    Initialize team configuration');
       console.log('  todo [list|add]    Manage team tasks');
+      console.log('  report [options]       Generate team report');
+      console.log('');
+      console.log('Report options:');
+      console.log('    --output, -o <path>  Output file path');
+      console.log('    --days, -d <n>       Filter to last N days');
+      console.log('    --open               Open report in browser');
       process.exit(1);
     }
   }
