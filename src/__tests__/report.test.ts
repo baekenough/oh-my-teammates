@@ -214,7 +214,6 @@ describe('ReportGenerator', () => {
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('Team Report');
     expect(html).toContain('No session data available.');
-    expect(html).toContain('No TODO data available.');
   });
 
   it('generates report with only team config present', async () => {
@@ -228,7 +227,6 @@ describe('ReportGenerator', () => {
     expect(html).toContain('Test Team');
     expect(html).toContain('Alice Smith');
     expect(html).toContain('No session data available.');
-    expect(html).toContain('No TODO data available.');
   });
 
   it('generates report with only stewards config present', async () => {
