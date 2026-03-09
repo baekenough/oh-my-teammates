@@ -25,7 +25,8 @@ export async function GET({ url }: { url: URL }): Promise<Response> {
     const user = url.searchParams.get('user');
     const branch = url.searchParams.get('branch');
     const days = url.searchParams.get('days');
-    const limit = parseInt(url.searchParams.get('limit') ?? '50', 10);
+    const limitRaw = parseInt(url.searchParams.get('limit') ?? '50', 10);
+    const limit = isNaN(limitRaw) ? 50 : limitRaw;
 
     const conditions: string[] = [];
     const params: (string | number)[] = [];

@@ -1,5 +1,4 @@
 <script lang="ts">
-import { onMount } from 'svelte';
 import { base } from '$app/paths';
 
 // --- Types ---
@@ -142,12 +141,7 @@ async function fetchData() {
   }
 }
 
-onMount(() => {
-  fetchData();
-});
-
 $effect(() => {
-  // Re-fetch when days changes (after initial mount)
   if (days) fetchData();
 });
 </script>
