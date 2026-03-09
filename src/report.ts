@@ -73,6 +73,7 @@ export class ReportGenerator {
     writeFileSync(outputPath, html, 'utf-8');
 
     // 5. Optionally open in browser (macOS only)
+    /* istanbul ignore next -- platform-specific: macOS only */
     if (options.open === true && process.platform === 'darwin') {
       Bun.spawn(['open', outputPath]);
     }
