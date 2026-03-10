@@ -1,6 +1,6 @@
 # Architecture Guide — oh-my-teammates
 
-> Version 0.2.0 | Runtime: Bun | Language: TypeScript (strict mode)
+> Version 0.5.1 | Runtime: Bun | Language: TypeScript (strict mode)
 
 ## Overview
 
@@ -13,43 +13,53 @@
 - **Project scaffolding** — automated project scanning and configuration bootstrapping
 - **CLI** — `omcustom-team` binary for day-to-day team operations
 - **Dashboard** — SvelteKit visualization layer for the team's agent/skill/rule inventory
+- **Agent recommendation** — 4-layer confidence scoring engine for tech stack analysis (`recommender.ts`)
+- **Report generation** — static HTML reports aggregating team, session, steward, and TODO data (`report.ts`)
 
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       omcustom-team CLI                         │
-│                           (cli.ts)                              │
-│         omcustom-team init   |   omcustom-team todo             │
-├──────────────────────────────┬──────────────────────────────────┤
-│                              │                                  │
-│  ┌───────────────────┐       │    ┌───────────────────────┐    │
-│  │    TeamConfig     │       │    │    SessionLogger       │    │
-│  │  (team-config.ts) │       │    │  (session-logger.ts)  │    │
-│  │                   │       │    │    bun:sqlite WAL      │    │
-│  │  team.yaml CRUD   │       │    │  sessions + events    │    │
-│  └───────────────────┘       │    └───────────────────────┘    │
-│                              │                                  │
-│  ┌───────────────────┐       │    ┌───────────────────────┐    │
-│  │     Stewards      │◄──────┘    │      TeamTodo         │    │
-│  │   (stewards.ts)   │            │   (team-todo.ts)      │    │
-│  │                   │◄───────────│                       │    │
-│  │ STEWARDS.yaml +   │  autoAssign│  TODO.md parsing +    │    │
-│  │ CODEOWNERS gen    │            │  priority management  │    │
-│  └───────────────────┘            └───────────────────────┘    │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                        init.ts                          │   │
-│  │   scanProject() → scaffoldTeamDir() → createTemplate()  │   │
-│  │   Detects: languages, frameworks, dependency manifests  │   │
-│  └─────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────┤
-│                     Public API (index.ts)                       │
-│     TeamConfig | SessionLogger | Stewards | TeamTodo            │
-├─────────────────────────────────────────────────────────────────┤
-│                    SvelteKit Dashboard                          │
-│          dashboard/ → adapter-static → GitHub Pages             │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                          omcustom-team CLI                           │
+│                              (cli.ts)                                │
+│      init  │  todo  │  recommend  │  report  │  status               │
+├────────────┴────────┴─────────────┴──────────┴───────────────────────┤
+│                                                                       │
+│  ┌─────────────┐  ┌──────────┐  ┌───────────────┐  ┌─────────────┐  │
+│  │ TeamConfig  │  │ Stewards │  │ SessionLogger │  │  TeamTodo   │  │
+│  │ team.yaml   │  │STEWARDS  │  │  bun:sqlite   │  │  TODO.md    │  │
+│  │ CRUD +      │  │.yaml +   │  │  WAL mode     │  │  priority + │  │
+│  │ validation  │←→│CODEOWNERS│←─│  sessions +   │  │  auto-      │  │
+│  └─────────────┘  │generation│  │  events       │  │  assign     │──┤
+│                    └─────┬───┘  └───────────────┘  └─────────────┘  │
+│                          │              │                  │          │
+│                          │              ▼                  │          │
+│  ┌─────────────┐         │    ┌───────────────┐           │          │
+│  │ Recommender │         │    │ReportGenerator│◄──────────┘          │
+│  │ 4-layer     │         │    │ HTML output   │                      │
+│  │ scoring     │         └───►│ aggregates    │                      │
+│  │             │              │ all modules   │                      │
+│  └──────┬──────┘              └───────────────┘                      │
+│         │                                                             │
+│  ┌──────┴──────┐  ┌──────────────┐                                   │
+│  │AgentCatalog │  │ManifestParser│                                   │
+│  │ 41 agents   │  │ package.json │                                   │
+│  │ detection   │  │ go.mod, etc  │                                   │
+│  │ rules       │  │              │                                   │
+│  └─────────────┘  └──────────────┘                                   │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │                          init.ts                              │   │
+│  │   scanProject() → scaffoldTeamDir() → scaffoldClaudeMd()      │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+├───────────────────────────────────────────────────────────────────────┤
+│                        Public API (index.ts)                          │
+│  TeamConfig │ SessionLogger │ Stewards │ TeamTodo │ Recommender       │
+│  ReportGenerator │ AgentCatalog │ ManifestParser                      │
+├───────────────────────────────────────────────────────────────────────┤
+│                       SvelteKit Dashboard                             │
+│             dashboard/ → adapter-static → GitHub Pages                │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Core Modules
@@ -200,6 +210,100 @@ interface TodoItem {
 
 ---
 
+## Steward Concept Deep Dive
+
+### Purpose
+
+Stewards answer the fundamental team question: **"Who is responsible for this code?"**
+
+Rather than managing CODEOWNERS manually at the file level, Stewards introduce a **domain abstraction layer**. You declare ownership at the domain level, and the system handles file-to-owner mapping automatically.
+
+### Core Value Proposition
+
+| Aspect | Traditional (CODEOWNERS) | Steward System |
+|--------|--------------------------|----------------|
+| Granularity | File/directory paths | **Domain** (8 semantic categories) |
+| Maintenance | Manual edits, easily outdated | Declarative YAML, auto-generates CODEOWNERS |
+| Task assignment | Manual per-task | Auto-assign via domain lookup |
+| Discoverability | Grep through CODEOWNERS | `findStewardForFile(path)` API |
+| Coverage visibility | None | Report highlights unowned domains |
+
+### How the Mapping Works
+
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   File Changed    │     │   Domain Match    │     │  Steward Found   │
+│                   │     │                   │     │                  │
+│ src/api/auth.ts   │────►│ backend           │────►│ primary: alice   │
+│                   │ glob│ (src/api/**)       │     │ backup:  bob     │
+└──────────────────┘match └──────────────────┘     └──────────────────┘
+```
+
+The `findStewardForFile()` method:
+1. Iterates through all domains in `STEWARDS.yaml`
+2. For each domain, tests the file path against every glob pattern in `paths[]`
+3. Returns the first matching domain's `primary` and `backup` steward
+4. Returns `undefined` if no domain claims the file (coverage gap)
+
+### Integration Points
+
+```
+STEWARDS.yaml ─────────────────────────────────┐
+     │                                          │
+     ├─► generateCodeowners()                   │
+     │     └─► .github/CODEOWNERS               │
+     │           └─► GitHub auto-assigns         │
+     │               PR reviewers                │
+     │                                          │
+     ├─► TeamTodo.autoAssign()                  │
+     │     └─► TODO items with domain but       │
+     │         no assignee get primary steward   │
+     │                                          │
+     ├─► ReportGenerator                        │
+     │     └─► Coverage gap analysis            │
+     │         (domains with no steward)         │
+     │                                          │
+     └─► findStewardForFile(path)               │
+           └─► Runtime query: "who owns this?"  │
+```
+
+### Practical Example
+
+Given this `STEWARDS.yaml`:
+
+```yaml
+stewards:
+  version: "1.0"
+  domains:
+    frontend:
+      primary: carol
+      backup: dave
+      paths:
+        - src/components/**
+        - "**/*.svelte"
+        - "**/*.tsx"
+    backend:
+      primary: alice
+      backup: bob
+      paths:
+        - src/api/**
+        - src/server/**
+```
+
+**Scenario 1: PR Review**
+A PR modifies `src/api/auth.ts` → Stewards generates CODEOWNERS → GitHub assigns `@alice` and `@bob` as reviewers automatically.
+
+**Scenario 2: TODO Auto-Assignment**
+```
+Before: ## team: [P0] Fix auth bug — (backend)     ← no assignee
+After:  ## team: [P0] Fix auth bug — @alice (backend) ← auto-assigned
+```
+
+**Scenario 3: Coverage Gap Detection**
+If `data-engineering` domain has `primary: null`, the report flags it as an unowned domain requiring attention.
+
+---
+
 ### init (`src/init.ts`)
 
 Project scanning and bootstrapping entry point.
@@ -236,6 +340,60 @@ Entry point for the `omcustom-team` binary, exported from `dist/cli.js`.
 
 **Exit codes:** Exits with code `1` on missing required arguments or missing TODO.md when `list` is called before `init`.
 
+---
+
+### Recommender (`src/recommender.ts`)
+
+Scans a project directory and produces ranked agent recommendations based on tech stack analysis.
+
+**Key types:**
+
+```typescript
+interface AgentRecommendation {
+  agent: string;         // Agent name from catalog
+  category: AgentCategory;
+  description: string;
+  confidence: number;    // 0.0 - 1.0
+  reasons: string[];     // Human-readable match reasons
+}
+```
+
+**4-layer confidence scoring:**
+
+| Layer | Signal | Max Confidence | Example |
+|-------|--------|---------------|---------|
+| 1. File extensions | `*.ts`, `*.py`, `*.go` | 0.5 | "42 .ts files found" |
+| 2. Config files | `tsconfig.json`, `Cargo.toml` | 0.8 | "tsconfig.json found" |
+| 3. Directory patterns | `dags/`, `migrations/` | 0.6 | "dags/ directory found" |
+| 4. Manifest dependencies | `react` in package.json | 0.9 | "react, next in package.json" |
+
+**Scoring algorithm:** Each layer produces a confidence score. The final confidence is `max(all layer scores)`, capped at 1.0. Higher layers (dependencies) override lower layers (extensions) when present.
+
+**Data flow:** `scanFiles()` → `parseManifests()` → `scoreAgent()` per catalog entry → sort by confidence → filter by `minConfidence`
+
+---
+
+### ReportGenerator (`src/report.ts`)
+
+Aggregates data from all core modules and produces a self-contained static HTML report.
+
+**Data sources:**
+
+| Source | Data Collected |
+|--------|---------------|
+| `TeamConfig` | Team name, member list |
+| `Stewards` | Domain ownership map, coverage gaps |
+| `TeamTodo` | Open/completed items, priority distribution |
+| `SessionLogger` | Recent sessions, event stats, user activity |
+
+**Report sections:** Team overview, domain stewardship matrix, TODO summary, session activity, coverage gap analysis.
+
+**Output:** Single `.html` file at `.claude/team/report.html` (configurable). No external dependencies — all CSS/JS is inlined.
+
+**Graceful degradation:** Each data source is independently collected. If `team.yaml` is missing, the report still generates with available data. No single missing file blocks report generation.
+
+---
+
 ## Data Flow
 
 ```
@@ -271,6 +429,26 @@ Stewards.writeCodeowners()
   │
   ├─ generateCodeowners() → format each domain's paths + owners
   └─ write to .github/CODEOWNERS
+
+Recommender.recommend()
+  │
+  ├─ scanFiles()
+  │     walk project tree → collect extensions, config files, directories
+  │
+  ├─ parseManifests()
+  │     detect package.json, go.mod, etc. → extract dependencies
+  │
+  └─ scoreAgent() × N catalog entries
+        4-layer scoring → sort by confidence → return recommendations
+
+ReportGenerator.generate()
+  │
+  ├─ collectTeamConfig()    → team.yaml data
+  ├─ collectDomains()       → STEWARDS.yaml data
+  ├─ collectTodos()         → TODO.md items
+  ├─ collectSessionData()   → SQLite session stats
+  ├─ computeCoverageGaps()  → unowned domains
+  └─ generateReportHtml()   → single HTML file output
 ```
 
 ## Dashboard

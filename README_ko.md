@@ -26,6 +26,8 @@ oh-my-customcode가 개인 에이전트 스택을 제공했다면, oh-my-teammat
 | `stewards.ts` | `STEWARDS.yaml` 관리, 8도메인 모델, CODEOWNERS 생성 |
 | `init.ts` | 프로젝트 스캔, 의존성 분석, 팀 설정 스캐폴딩 |
 | `team-todo.ts` | 우선순위 레벨 및 스튜어드 기반 자동 할당 팀 작업 관리 |
+| `recommender.ts` | 에이전트 추천을 위한 4계층 신뢰도 점수 기반 프로젝트 스캔 엔진 |
+| `report.ts` | 팀, 스튜어드, 세션, TODO 데이터를 집계하는 정적 HTML 리포트 생성기 |
 | `cli.ts` | `omcustom-team init` 및 `omcustom-team todo` CLI 명령어 |
 | 대시보드 | SvelteKit 기반 에이전트/스킬/규칙/가이드 시각화, 다크모드 및 모바일 지원 |
 
@@ -39,6 +41,66 @@ oh-my-customcode가 개인 에이전트 스택을 제공했다면, oh-my-teammat
 | **팀 TODO** | 스튜어드 및 이슈와 연동된 공유 작업 관리 |
 | **품질 메트릭** | Rule Adherence Rate (RAR) 추적, 목표 98% |
 | **적응형 확장** | 기술 스택 변화 자동 감지 후 새 에이전트/스킬 추천 |
+| **에이전트 추천** | 프로젝트 구조를 스캔하여 기술 스택에 맞는 에이전트 추천 |
+| **HTML 리포트** | 팀 데이터를 정적 대시보드 리포트로 집계 |
+
+## 스튜어드 작동 방식
+
+스튜어드는 **도메인 관리인**입니다 — 코드베이스 전반에 걸쳐 "누가 무엇을 책임지는가"를 선언합니다. `.github/CODEOWNERS`를 수동으로 편집하는 대신, `STEWARDS.yaml`에서 **도메인 단위**로 소유권을 정의합니다.
+
+### 스튜어드가 해결하는 문제
+
+| 스튜어드 없이 | 스튜어드 사용 시 |
+|---------------|-----------------|
+| `.github/CODEOWNERS`를 파일별 수동 편집 | **도메인** 단위로 소유권 정의 → CODEOWNERS 자동 생성 |
+| "이 PR 누가 리뷰해야 해?" → 물어보기 | `findStewardForFile("src/api/auth.ts")` → `alice` |
+| TODO 작업 수동 할당 | `autoAssign()`으로 도메인 기반 자동 할당 |
+| 커버리지 갭 파악 불가 | 리포트에서 소유자 없는 도메인 표시 |
+
+### 작동 원리
+
+```
+STEWARDS.yaml                        .github/CODEOWNERS
+┌──────────────────────┐             ┌──────────────────────────┐
+│ domains:             │             │ # 자동 생성               │
+│   frontend:          │  ────────►  │ /src/components/** @carol │
+│     primary: carol   │  CODEOWNERS │ /**/*.svelte @carol @dave │
+│     backup: dave     │  생성       │                           │
+│     paths:           │             │ /src/api/** @alice @bob   │
+│       - src/comp/**  │             └──────────────────────────┘
+│       - **/*.svelte  │
+│   backend:           │             TODO.md (자동 할당)
+│     primary: alice   │             ┌──────────────────────────┐
+│     backup: bob      │  ────────►  │ [P0] Fix auth — @alice   │
+│     paths:           │  autoAssign │   (backend 도메인)       │
+│       - src/api/**   │             │ [P1] Update UI — @carol  │
+└──────────────────────┘             │   (frontend 도메인)      │
+                                     └──────────────────────────┘
+```
+
+### 파일 → 도메인 → 스튜어드 매핑
+
+파일이 변경되면, 스튜어드가 체인을 추적합니다:
+
+```
+src/components/Button.tsx → frontend 도메인 → carol (주담당), dave (백업)
+dags/daily_etl.py        → data-engineering → dave (주담당)
+Dockerfile               → infrastructure   → eve (주담당)
+src/api/auth.ts          → backend 도메인   → alice (주담당), bob (백업)
+```
+
+### 8개 기본 도메인
+
+| 도메인 | 범위 | 예시 패턴 |
+|--------|------|----------|
+| `languages` | 언어별 코드 | `**/*.ts`, `**/*.py`, `**/*.go` |
+| `frontend` | UI 컴포넌트 & 프레임워크 | `src/components/**`, `**/*.svelte` |
+| `backend` | 서버 & API 코드 | `src/api/**`, `routes/**` |
+| `data-engineering` | 파이프라인 & DAG | `dags/**`, `pipelines/**` |
+| `infrastructure` | 배포 & CI/CD | `Dockerfile`, `terraform/**` |
+| `database` | 스키마 & 마이그레이션 | `**/*.sql`, `migrations/**` |
+| `quality` | 테스트 & 스펙 | `**/*.test.ts`, `__tests__/**` |
+| `documentation` | 문서 & 가이드 | `docs/**`, `**/*.md` |
 
 ## 빠른 시작
 
@@ -76,6 +138,16 @@ bunx omcustom-team todo list
 # 새 팀 작업 추가
 bunx omcustom-team todo add API 요청 제한 수정
 ```
+
+### `omcustom-team recommend`
+
+프로젝트를 스캔하고 에이전트를 추천합니다:
+
+```bash
+bunx omcustom-team recommend
+```
+
+파일 확장자, 설정 파일, 디렉토리 패턴, 매니페스트 의존성을 분석하여 기술 스택에 가장 적합한 oh-my-customcode 에이전트를 추천합니다.
 
 ## 대시보드
 
@@ -227,9 +299,9 @@ bun run build        # 프로덕션 빌드
 | 단계 | 기능 | 상태 |
 |------|------|------|
 | V1 | Guardian CI, 세션 로깅, 스튜어드, 팀 TODO | **출시 (v0.2.0)** |
-| V1.5 | 정적 HTML 리포트 (`omcustom-team report`) | 계획됨 |
-| V2 | 대시보드 고도화 — 온톨로지 그래프, 세션 타임라인, RAR 메트릭 | 계획됨 |
-| V3 | 적응형 확장 -- 자동 감지 및 추천 | 계획됨 |
+| V1.5 | 정적 HTML 리포트 (`omcustom-team report`) | **출시 (v0.5.0)** |
+| V2 | 대시보드 고도화 — 온톨로지 그래프, 세션 타임라인, RAR 메트릭 | **출시 (v0.5.0)** |
+| V3 | 적응형 확장 -- 자동 감지 및 추천 | **출시 (v0.5.0)** |
 
 ## 관련 프로젝트
 
