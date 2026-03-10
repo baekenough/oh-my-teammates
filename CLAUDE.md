@@ -154,6 +154,7 @@ oh-my-customcode로 구동됩니다.
 | `/fix-refs` | 깨진 참조 수정 |
 | `/dev-review` | 코드 베스트 프랙티스 리뷰 |
 | `/dev-refactor` | 코드 리팩토링 |
+| `/research` | 10-team 병렬 딥 분석 및 교차 검증 |
 | `/memory-save` | 세션 컨텍스트를 claude-mem에 저장 |
 | `/memory-recall` | 메모리 검색 및 리콜 |
 | `/monitoring-setup` | OTel 콘솔 모니터링 활성화/비활성화 |
@@ -176,7 +177,7 @@ project/
 +-- CLAUDE.md                    # 진입점
 +-- .claude/
 |   +-- agents/                  # 서브에이전트 정의 (41 파일)
-|   +-- skills/                  # 스킬 (56 디렉토리)
+|   +-- skills/                  # 스킬 (64 디렉토리)
 |   +-- rules/                   # 전역 규칙 (R000-R018)
 |   +-- hooks/                   # 훅 스크립트 (메모리, HUD)
 |   +-- contexts/                # 컨텍스트 파일 (ecomode)
