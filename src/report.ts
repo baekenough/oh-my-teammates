@@ -17,6 +17,7 @@ export interface ReportOptions {
   output?: string;
   days?: number;
   open?: boolean;
+  excludeDomains?: string[];
 }
 
 export class ReportGenerator {
@@ -33,14 +34,15 @@ export class ReportGenerator {
     // 1. Collect data from all sources (graceful fallback)
     const teamConfig = this.collectTeamConfig();
     const domainsMap = this.collectDomains();
+    const filteredDomains = this.applyDomainFilter(domainsMap, options.excludeDomains ?? []);
     const todoItems = this.collectTodos();
     const sessionData = this.collectSessionData(days);
-    const coverageGaps = this.computeCoverageGaps(domainsMap);
+    const coverageGaps = this.computeCoverageGaps(filteredDomains);
 
     // 2. Build ReportData
     const teamName = teamConfig?.name ?? 'Team';
     const members = teamConfig?.members ?? [];
-    const domains = domainsMap ?? {};
+    const domains = filteredDomains ?? {};
 
     const todos = todoItems !== null ? this.summarizeTodos(todoItems) : null;
 
@@ -190,6 +192,23 @@ export class ReportGenerator {
     } finally {
       logger?.close();
     }
+  }
+
+  private applyDomainFilter(
+    domains: ReportData['domains'] | null,
+    exclude: string[],
+  ): ReportData['domains'] | null {
+    if (domains === null || exclude.length === 0) {
+      return domains;
+    }
+    const excludeSet = new Set(exclude);
+    const filtered: ReportData['domains'] = {};
+    for (const [domain, steward] of Object.entries(domains)) {
+      if (!excludeSet.has(domain)) {
+        filtered[domain] = steward;
+      }
+    }
+    return filtered;
   }
 
   private computeCoverageGaps(domains: ReportData['domains'] | null): string[] {

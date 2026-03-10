@@ -59,7 +59,9 @@ describe('runCli', () => {
       const { runCli } = await import('../cli');
       await expect(runCli(['unknown-command'])).rejects.toThrow('process.exit(1)');
       expect(
-        consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo|report|recommend]')),
+        consoleLogs.some((l) =>
+          l.includes('Usage: omcustom-team [init|todo|report|recommend|sessions]'),
+        ),
       ).toBe(true);
       expect(processExitCode).toBe(1);
     });
@@ -68,7 +70,9 @@ describe('runCli', () => {
       const { runCli } = await import('../cli');
       await expect(runCli([])).rejects.toThrow('process.exit(1)');
       expect(
-        consoleLogs.some((l) => l.includes('Usage: omcustom-team [init|todo|report|recommend]')),
+        consoleLogs.some((l) =>
+          l.includes('Usage: omcustom-team [init|todo|report|recommend|sessions]'),
+        ),
       ).toBe(true);
       expect(processExitCode).toBe(1);
     });
@@ -704,6 +708,229 @@ describe('runCli', () => {
       );
 
       recommendSpy.mockRestore();
+    });
+  });
+
+  // ── sessions command ──────────────────────────────────────────────────────
+
+  describe('sessions command', () => {
+    let originalCwd: string;
+
+    beforeEach(() => {
+      originalCwd = process.cwd();
+    });
+
+    afterEach(() => {
+      process.chdir(originalCwd);
+    });
+
+    it('prints message and exits when no sessions database exists', async () => {
+      // Change to a temp dir that has no sessions.db
+      const emptyDir = makeTempDir();
+      process.chdir(emptyDir);
+
+      const { runCli } = await import('../cli');
+      await expect(runCli(['sessions'])).rejects.toThrow('process.exit(1)');
+
+      expect(consoleLogs.some((l) => l.includes('No sessions database found'))).toBe(true);
+      expect(processExitCode).toBe(1);
+
+      cleanup(emptyDir);
+    });
+
+    it('prints "No sessions found." when database exists but is empty', async () => {
+      const tmpDir = makeTempDir();
+      const teamDir = join(tmpDir, '.claude', 'team');
+      mkdirSync(teamDir, { recursive: true });
+      process.chdir(tmpDir);
+
+      const sessionLoggerModule = await import('../session-logger');
+      const listSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'listSessions',
+      ).mockReturnValue([]);
+      const closeSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'close',
+      ).mockImplementation(() => {});
+
+      // Create the DB file so existsSync returns true
+      writeFileSync(join(teamDir, 'sessions.db'), '');
+
+      const { runCli } = await import('../cli');
+      await runCli(['sessions']);
+
+      expect(consoleLogs.some((l) => l.includes('No sessions found.'))).toBe(true);
+
+      listSpy.mockRestore();
+      closeSpy.mockRestore();
+      cleanup(tmpDir);
+    });
+
+    it('lists sessions with correct format when sessions exist', async () => {
+      const tmpDir = makeTempDir();
+      const teamDir = join(tmpDir, '.claude', 'team');
+      mkdirSync(teamDir, { recursive: true });
+      writeFileSync(join(teamDir, 'sessions.db'), '');
+      process.chdir(tmpDir);
+
+      const sessionLoggerModule = await import('../session-logger');
+      const mockSessions = [
+        {
+          id: 'sess-1',
+          startedAt: '2024-03-10T09:30:00.000Z',
+          endedAt: '2024-03-10T10:00:00.000Z',
+          user: 'alice',
+          branch: 'feature/auth',
+          summary: 'Implemented OAuth flow',
+        },
+        {
+          id: 'sess-2',
+          startedAt: '2024-03-10T11:00:00.000Z',
+          endedAt: null,
+          user: 'bob',
+          branch: 'develop',
+          summary: null,
+        },
+      ];
+      const listSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'listSessions',
+      ).mockReturnValue(mockSessions);
+      const closeSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'close',
+      ).mockImplementation(() => {});
+
+      const { runCli } = await import('../cli');
+      await runCli(['sessions']);
+
+      // Completed session uses ✓
+      expect(
+        consoleLogs.some(
+          (l) => l.includes('✓') && l.includes('@alice') && l.includes('feature/auth'),
+        ),
+      ).toBe(true);
+      // Active session uses →
+      expect(
+        consoleLogs.some((l) => l.includes('→') && l.includes('@bob') && l.includes('develop')),
+      ).toBe(true);
+      // No summary shown as (no summary)
+      expect(consoleLogs.some((l) => l.includes('(no summary)'))).toBe(true);
+      // Summary shown for alice's session
+      expect(consoleLogs.some((l) => l.includes('Implemented OAuth flow'))).toBe(true);
+
+      listSpy.mockRestore();
+      closeSpy.mockRestore();
+      cleanup(tmpDir);
+    });
+
+    it('passes search option when --search flag is provided', async () => {
+      const tmpDir = makeTempDir();
+      const teamDir = join(tmpDir, '.claude', 'team');
+      mkdirSync(teamDir, { recursive: true });
+      writeFileSync(join(teamDir, 'sessions.db'), '');
+      process.chdir(tmpDir);
+
+      const sessionLoggerModule = await import('../session-logger');
+      const listSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'listSessions',
+      ).mockReturnValue([]);
+      const closeSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'close',
+      ).mockImplementation(() => {});
+
+      const { runCli } = await import('../cli');
+      await runCli(['sessions', '--search', 'oauth']);
+
+      expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ search: 'oauth' }));
+
+      listSpy.mockRestore();
+      closeSpy.mockRestore();
+      cleanup(tmpDir);
+    });
+
+    it('passes user option when --user flag is provided', async () => {
+      const tmpDir = makeTempDir();
+      const teamDir = join(tmpDir, '.claude', 'team');
+      mkdirSync(teamDir, { recursive: true });
+      writeFileSync(join(teamDir, 'sessions.db'), '');
+      process.chdir(tmpDir);
+
+      const sessionLoggerModule = await import('../session-logger');
+      const listSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'listSessions',
+      ).mockReturnValue([]);
+      const closeSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'close',
+      ).mockImplementation(() => {});
+
+      const { runCli } = await import('../cli');
+      await runCli(['sessions', '--user', 'alice']);
+
+      expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ user: 'alice' }));
+
+      listSpy.mockRestore();
+      closeSpy.mockRestore();
+      cleanup(tmpDir);
+    });
+
+    it('passes limit option when --limit flag is provided', async () => {
+      const tmpDir = makeTempDir();
+      const teamDir = join(tmpDir, '.claude', 'team');
+      mkdirSync(teamDir, { recursive: true });
+      writeFileSync(join(teamDir, 'sessions.db'), '');
+      process.chdir(tmpDir);
+
+      const sessionLoggerModule = await import('../session-logger');
+      const listSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'listSessions',
+      ).mockReturnValue([]);
+      const closeSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'close',
+      ).mockImplementation(() => {});
+
+      const { runCli } = await import('../cli');
+      await runCli(['sessions', '--limit', '5']);
+
+      expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ limit: 5 }));
+
+      listSpy.mockRestore();
+      closeSpy.mockRestore();
+      cleanup(tmpDir);
+    });
+
+    it('uses -s shorthand for search', async () => {
+      const tmpDir = makeTempDir();
+      const teamDir = join(tmpDir, '.claude', 'team');
+      mkdirSync(teamDir, { recursive: true });
+      writeFileSync(join(teamDir, 'sessions.db'), '');
+      process.chdir(tmpDir);
+
+      const sessionLoggerModule = await import('../session-logger');
+      const listSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'listSessions',
+      ).mockReturnValue([]);
+      const closeSpy = spyOn(
+        sessionLoggerModule.SessionLogger.prototype,
+        'close',
+      ).mockImplementation(() => {});
+
+      const { runCli } = await import('../cli');
+      await runCli(['sessions', '-s', 'fix']);
+
+      expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ search: 'fix' }));
+
+      listSpy.mockRestore();
+      closeSpy.mockRestore();
+      cleanup(tmpDir);
     });
   });
 

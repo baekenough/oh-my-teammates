@@ -305,6 +305,88 @@ describe('ReportGenerator', () => {
   });
 });
 
+// ── domain exclusion (Issue #104) ─────────────────────────────────────────────
+
+describe('domain exclusion', () => {
+  let tmpDir: string;
+  let teamDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+    teamDir = createTeamDir(tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  function writeMultiDomainStewards(dir: string): void {
+    const stewardsYaml = stringify({
+      stewards: {
+        version: '1.0',
+        domains: {
+          frontend: { primary: 'bob', backup: null, paths: ['src/components/**'] },
+          backend: { primary: 'alice', backup: 'bob', paths: ['src/api/**'] },
+        },
+      },
+    });
+    writeFileSync(join(dir, 'STEWARDS.yaml'), stewardsYaml, 'utf-8');
+  }
+
+  it('should exclude specified domains from report', async () => {
+    writeMultiDomainStewards(teamDir);
+
+    const generator = new ReportGenerator(tmpDir);
+    const outputPath = await generator.generate({ excludeDomains: ['frontend'] });
+
+    const html = readFileSync(outputPath, 'utf-8');
+    // 'backend' domain IS present in the Domain Ownership Matrix
+    expect(html).toContain('backend');
+    // 'frontend' domain should NOT appear in the domains table section
+    // Note: it may still appear in member domain lists; check domain matrix rows
+    const domainMatrixMatch = html.match(/Domain Ownership Matrix[\s\S]*?Coverage Gaps/);
+    expect(domainMatrixMatch).not.toBeNull();
+    // biome-ignore lint/style/noNonNullAssertion: existence verified by not.toBeNull above
+    expect(domainMatrixMatch![0]).not.toContain('>frontend<');
+    // biome-ignore lint/style/noNonNullAssertion: existence verified by not.toBeNull above
+    expect(domainMatrixMatch![0]).toContain('>backend<');
+  });
+
+  it('should exclude domains from coverage gaps', async () => {
+    // frontend has no backup — would normally be a coverage gap
+    writeMultiDomainStewards(teamDir);
+
+    const generator = new ReportGenerator(tmpDir);
+    const outputPath = await generator.generate({ excludeDomains: ['frontend'] });
+
+    const html = readFileSync(outputPath, 'utf-8');
+    // After exclusion, only backend remains and it has a backup — so all covered
+    expect(html).toContain('All domains have backup stewards.');
+  });
+
+  it('should include all domains when excludeDomains is empty', async () => {
+    writeMultiDomainStewards(teamDir);
+
+    const generator = new ReportGenerator(tmpDir);
+    const outputPath = await generator.generate({ excludeDomains: [] });
+
+    const html = readFileSync(outputPath, 'utf-8');
+    expect(html).toContain('frontend');
+    expect(html).toContain('backend');
+  });
+
+  it('should include all domains when excludeDomains is undefined', async () => {
+    writeMultiDomainStewards(teamDir);
+
+    const generator = new ReportGenerator(tmpDir);
+    const outputPath = await generator.generate();
+
+    const html = readFileSync(outputPath, 'utf-8');
+    expect(html).toContain('frontend');
+    expect(html).toContain('backend');
+  });
+});
+
 // ── generateReportHtml ────────────────────────────────────────────────────────
 
 describe('generateReportHtml', () => {
