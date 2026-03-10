@@ -171,13 +171,19 @@ export class SessionLogger {
     };
   }
 
-  listSessions(options?: { user?: string; limit?: number }): Session[] {
+  listSessions(options?: { user?: string; search?: string; limit?: number }): Session[] {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
 
     if (options?.user !== undefined) {
       conditions.push('user = ?');
       params.push(options.user);
+    }
+
+    if (options?.search !== undefined) {
+      const term = `%${options.search}%`;
+      conditions.push('(summary LIKE ? OR branch LIKE ? OR user LIKE ?)');
+      params.push(term, term, term);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -242,8 +248,8 @@ export class SessionLogger {
   }
 
   getSessionStats(days?: number): SessionStats {
-    const whereClause =
-      days !== undefined ? `WHERE started_at >= datetime('now', '-' || ${days} || ' days')` : '';
+    const whereClause = days !== undefined ? `WHERE started_at >= datetime('now', ?)` : '';
+    const params: string[] = days !== undefined ? [`-${days} days`] : [];
 
     const row = this.db
       .prepare<
@@ -253,7 +259,7 @@ export class SessionLogger {
           avg_duration_minutes: number | null;
           total_duration_minutes: number | null;
         },
-        []
+        string[]
       >(
         `SELECT
            COUNT(*) AS total_sessions,
@@ -270,7 +276,7 @@ export class SessionLogger {
            ) AS total_duration_minutes
          FROM sessions ${whereClause}`,
       )
-      .get();
+      .get(...params);
 
     return {
       totalSessions: row?.total_sessions ?? 0,
@@ -281,8 +287,8 @@ export class SessionLogger {
   }
 
   getEventStats(days?: number): EventTypeCount[] {
-    const whereClause =
-      days !== undefined ? `WHERE timestamp >= datetime('now', '-' || ${days} || ' days')` : '';
+    const whereClause = days !== undefined ? `WHERE timestamp >= datetime('now', ?)` : '';
+    const params: string[] = days !== undefined ? [`-${days} days`] : [];
 
     const rows = this.db
       .prepare<
@@ -290,14 +296,14 @@ export class SessionLogger {
           type: string;
           count: number;
         },
-        []
+        string[]
       >(
         `SELECT type, COUNT(*) AS count
          FROM session_events ${whereClause}
          GROUP BY type
          ORDER BY count DESC`,
       )
-      .all();
+      .all(...params);
 
     return rows.map((row) => ({
       type: row.type,
@@ -306,8 +312,8 @@ export class SessionLogger {
   }
 
   getActiveUsers(days?: number): UserActivity[] {
-    const whereClause =
-      days !== undefined ? `WHERE started_at >= datetime('now', '-' || ${days} || ' days')` : '';
+    const whereClause = days !== undefined ? `WHERE started_at >= datetime('now', ?)` : '';
+    const params: string[] = days !== undefined ? [`-${days} days`] : [];
 
     const rows = this.db
       .prepare<
@@ -316,7 +322,7 @@ export class SessionLogger {
           session_count: number;
           total_minutes: number | null;
         },
-        []
+        string[]
       >(
         `SELECT
            user,
@@ -330,7 +336,7 @@ export class SessionLogger {
          GROUP BY user
          ORDER BY session_count DESC`,
       )
-      .all();
+      .all(...params);
 
     return rows.map((row) => ({
       user: row.user,
@@ -340,8 +346,8 @@ export class SessionLogger {
   }
 
   getBranchDistribution(days?: number): BranchCount[] {
-    const whereClause =
-      days !== undefined ? `WHERE started_at >= datetime('now', '-' || ${days} || ' days')` : '';
+    const whereClause = days !== undefined ? `WHERE started_at >= datetime('now', ?)` : '';
+    const params: string[] = days !== undefined ? [`-${days} days`] : [];
 
     const rows = this.db
       .prepare<
@@ -349,14 +355,14 @@ export class SessionLogger {
           branch: string;
           count: number;
         },
-        []
+        string[]
       >(
         `SELECT branch, COUNT(*) AS count
          FROM sessions ${whereClause}
          GROUP BY branch
          ORDER BY count DESC`,
       )
-      .all();
+      .all(...params);
 
     return rows.map((row) => ({
       branch: row.branch,

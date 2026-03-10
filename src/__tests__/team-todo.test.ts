@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { TeamTodo } from '../team-todo';
@@ -330,7 +330,103 @@ describe('exists()', () => {
   });
 });
 
-// 8. createTemplate()
+// 8. labels support
+describe('labels support', () => {
+  it('should parse labels from TODO line', () => {
+    const content = `# Team TODO\n\n## team: [P1] Fix login bug [bug, urgent]\n`;
+    const path = writeTodo(tmpDir, content);
+    const todo = new TeamTodo(path);
+
+    const items = todo.load();
+    expect(items.length).toBe(1);
+    expect(items[0]?.labels).toEqual(['bug', 'urgent']);
+  });
+
+  it('should handle items without labels', () => {
+    const content = `# Team TODO\n\n## team: [P1] Fix login bug\n`;
+    const path = writeTodo(tmpDir, content);
+    const todo = new TeamTodo(path);
+
+    const items = todo.load();
+    expect(items.length).toBe(1);
+    expect(items[0]?.labels).toBeUndefined();
+  });
+
+  it('should serialize labels correctly', () => {
+    const content = `# Team TODO\n\n## team: [P1] Fix login bug [bug, urgent]\n`;
+    const path = writeTodo(tmpDir, content);
+    const todo = new TeamTodo(path);
+
+    todo.load();
+    todo.save();
+
+    const saved = readFileSync(path, 'utf-8');
+    expect(saved).toContain('[bug, urgent]');
+  });
+
+  it('should roundtrip labels through parse/serialize', () => {
+    const content = `# Team TODO\n\n## team: [P1] Fix login bug [bug, urgent]\n`;
+    const path = writeTodo(tmpDir, content);
+    const todo = new TeamTodo(path);
+
+    const items1 = todo.load();
+    todo.save();
+
+    const todo2 = new TeamTodo(path);
+    const items2 = todo2.load();
+
+    expect(items2[0]?.labels).toEqual(items1[0]?.labels);
+    expect(items2[0]?.description).toEqual(items1[0]?.description);
+  });
+
+  it('should filter by label', () => {
+    const content = [
+      '# Team TODO',
+      '',
+      '## team: [P1] Fix login bug [bug, urgent]',
+      '## team: [P1] Add feature [feature]',
+      '## team: [P2] Update docs',
+      '',
+    ].join('\n');
+    const path = writeTodo(tmpDir, content);
+    const todo = new TeamTodo(path);
+    todo.load();
+
+    const bugItems = todo.list({ label: 'bug' });
+    expect(bugItems.length).toBe(1);
+    expect(bugItems[0]?.description).toBe('Fix login bug');
+
+    const featureItems = todo.list({ label: 'feature' });
+    expect(featureItems.length).toBe(1);
+
+    const noLabelItems = todo.list({ label: 'nonexistent' });
+    expect(noLabelItems.length).toBe(0);
+  });
+
+  it('should handle empty labels brackets', () => {
+    const content = `# Team TODO\n\n## team: [P1] Fix login bug []\n`;
+    const path = writeTodo(tmpDir, content);
+    const todo = new TeamTodo(path);
+
+    const items = todo.load();
+    expect(items.length).toBe(1);
+    expect(items[0]?.labels).toBeUndefined();
+  });
+
+  it('should parse labels with assignee and domain', () => {
+    const content = `# Team TODO\n\n## team: [P1] Fix login bug — @alice (backend) [bug, urgent]\n`;
+    const path = writeTodo(tmpDir, content);
+    const todo = new TeamTodo(path);
+
+    const items = todo.load();
+    expect(items.length).toBe(1);
+    expect(items[0]?.assignee).toBe('alice');
+    expect(items[0]?.domain).toBe('backend');
+    expect(items[0]?.labels).toEqual(['bug', 'urgent']);
+  });
+});
+
+// 9. createTemplate()
 describe('TeamTodo.createTemplate()', () => {
   it('creates a file with template content', () => {
     const path = join(tmpDir, 'TODO.md');

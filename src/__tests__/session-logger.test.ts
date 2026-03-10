@@ -353,3 +353,174 @@ describe('SessionLogger', () => {
     });
   });
 });
+
+// ── listSessions with search (Issue #101) ─────────────────────────────────────
+
+describe('listSessions with search', () => {
+  it('should find sessions by summary keyword', () => {
+    const searchLogger = new SessionLogger(join(makeTempDir(), 'search-test.db'));
+
+    searchLogger.startSession('alice', 'main');
+    searchLogger.endSession('Fixed authentication bug');
+
+    searchLogger.startSession('bob', 'feature/login');
+    searchLogger.endSession('Added new login page');
+
+    searchLogger.startSession('charlie', 'develop');
+    searchLogger.endSession('Refactored database layer');
+
+    const results = searchLogger.listSessions({ search: 'login' });
+    // "Added new login page" matches summary, "feature/login" matches branch — same row (bob)
+    expect(results.length).toBe(1);
+    expect(results[0]?.user).toBe('bob');
+
+    searchLogger.close();
+  });
+
+  it('should find sessions by branch name', () => {
+    const searchLogger = new SessionLogger(join(makeTempDir(), 'search-branch.db'));
+
+    searchLogger.startSession('alice', 'feature/auth');
+    searchLogger.endSession('Work on auth');
+
+    searchLogger.startSession('bob', 'main');
+    searchLogger.endSession('Hotfix');
+
+    const results = searchLogger.listSessions({ search: 'auth' });
+    // branch "feature/auth" and summary "Work on auth" both match — but it's the same row (alice)
+    expect(results.length).toBe(1);
+    expect(results[0]?.user).toBe('alice');
+
+    searchLogger.close();
+  });
+
+  it('should find sessions by user name', () => {
+    const searchLogger = new SessionLogger(join(makeTempDir(), 'search-user.db'));
+
+    searchLogger.startSession('alice', 'main');
+    searchLogger.endSession('Task 1');
+
+    searchLogger.startSession('bob', 'main');
+    searchLogger.endSession('Task 2');
+
+    const results = searchLogger.listSessions({ search: 'alice' });
+    expect(results.length).toBe(1);
+    expect(results[0]?.user).toBe('alice');
+
+    searchLogger.close();
+  });
+
+  it('should return empty for no matches', () => {
+    const searchLogger = new SessionLogger(join(makeTempDir(), 'search-empty.db'));
+
+    searchLogger.startSession('alice', 'main');
+    searchLogger.endSession('Some task');
+
+    const results = searchLogger.listSessions({ search: 'nonexistent' });
+    expect(results.length).toBe(0);
+
+    searchLogger.close();
+  });
+
+  it('should handle NULL summary gracefully', () => {
+    const searchLogger = new SessionLogger(join(makeTempDir(), 'search-null.db'));
+
+    searchLogger.startSession('alice', 'main');
+    // Don't end session — summary stays NULL
+
+    searchLogger.startSession('bob', 'main');
+    searchLogger.endSession('Completed task');
+
+    const results = searchLogger.listSessions({ search: 'alice' });
+    // Should find alice by user field, even though summary is NULL
+    expect(results.length).toBe(1);
+    expect(results[0]?.user).toBe('alice');
+
+    searchLogger.close();
+  });
+
+  it('should combine search with user filter', () => {
+    const searchLogger = new SessionLogger(join(makeTempDir(), 'search-combo.db'));
+
+    searchLogger.startSession('alice', 'feature/login');
+    searchLogger.endSession('Login work');
+
+    searchLogger.startSession('bob', 'feature/login');
+    searchLogger.endSession('Login review');
+
+    const results = searchLogger.listSessions({ search: 'login', user: 'alice' });
+    expect(results.length).toBe(1);
+    expect(results[0]?.user).toBe('alice');
+
+    searchLogger.close();
+  });
+});
+
+// ── parameterized days filter (Issue #100) ────────────────────────────────────
+
+describe('parameterized days filter', () => {
+  it('should filter session stats by days parameter', () => {
+    const statsLogger = new SessionLogger(join(makeTempDir(), 'param-stats.db'));
+
+    statsLogger.startSession('alice', 'main');
+    statsLogger.endSession('Recent task');
+
+    const stats = statsLogger.getSessionStats(30);
+    expect(stats.totalSessions).toBeGreaterThanOrEqual(1);
+
+    const statsAll = statsLogger.getSessionStats();
+    expect(statsAll.totalSessions).toBeGreaterThanOrEqual(1);
+
+    statsLogger.close();
+  });
+
+  it('should filter event stats by days parameter', () => {
+    const eventsLogger = new SessionLogger(join(makeTempDir(), 'param-events.db'));
+
+    eventsLogger.startSession('alice', 'main');
+    eventsLogger.logEvent('note', { message: 'test' });
+    eventsLogger.endSession();
+
+    const events = eventsLogger.getEventStats(30);
+    expect(events.length).toBeGreaterThanOrEqual(1);
+
+    const eventsAll = eventsLogger.getEventStats();
+    expect(eventsAll.length).toBeGreaterThanOrEqual(1);
+
+    eventsLogger.close();
+  });
+
+  it('should filter active users by days parameter', () => {
+    const usersLogger = new SessionLogger(join(makeTempDir(), 'param-users.db'));
+
+    usersLogger.startSession('alice', 'main');
+    usersLogger.endSession();
+
+    const users = usersLogger.getActiveUsers(30);
+    expect(users.length).toBe(1);
+    expect(users[0]?.user).toBe('alice');
+
+    const usersAll = usersLogger.getActiveUsers();
+    expect(usersAll.length).toBe(1);
+
+    usersLogger.close();
+  });
+
+  it('should filter branch distribution by days parameter', () => {
+    const branchLogger = new SessionLogger(join(makeTempDir(), 'param-branches.db'));
+
+    branchLogger.startSession('alice', 'main');
+    branchLogger.endSession();
+
+    branchLogger.startSession('bob', 'develop');
+    branchLogger.endSession();
+
+    const branches = branchLogger.getBranchDistribution(30);
+    expect(branches.length).toBe(2);
+
+    const branchesAll = branchLogger.getBranchDistribution();
+    expect(branchesAll.length).toBe(2);
+
+    branchLogger.close();
+  });
+});

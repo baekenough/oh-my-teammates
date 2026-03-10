@@ -1,0 +1,214 @@
+name: Propose Upstream Features
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no issue creation)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  analyze-and-propose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      UPSTREAM_REPO: baekenough/oh-my-customcode
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files since last run
+        id: changes
+        run: |
+          # Get the merge commit and its parents
+          MERGE_BASE=$(git log --merges -1 --format=%H 2>/dev/null || echo "")
+          if [ -z "$MERGE_BASE" ]; then
+            echo "No merge commits found, using last 2 commits"
+            DIFF_BASE="HEAD~1"
+          else
+            DIFF_BASE="${MERGE_BASE}^1"
+          fi
+
+          CHANGED=$(git diff --name-only "$DIFF_BASE" HEAD -- src/ | tr '\n' ' ')
+          echo "files=$CHANGED" >> $GITHUB_OUTPUT
+
+          # Extract commit messages for analysis
+          MESSAGES=$(git log "$DIFF_BASE"..HEAD --format="%s" | tr '\n' '|')
+          echo "messages=$MESSAGES" >> $GITHUB_OUTPUT
+
+      - name: Detect proposable patterns
+        id: detect
+        env:
+          MESSAGES: ${{ steps.changes.outputs.messages }}
+          FILES: ${{ steps.changes.outputs.files }}
+        run: |
+          PROPOSALS=""
+
+          # Pattern 1: Security fixes → upstream should check too
+          if echo "$MESSAGES" | grep -qi "sql.*inject\|parameteriz\|security\|xss\|sanitiz"; then
+            PROPOSALS="${PROPOSALS}security|"
+          fi
+
+          # Pattern 2: Search/filter capabilities → could be generic utility
+          if echo "$MESSAGES" | grep -qi "search\|filter\|query.*builder"; then
+            PROPOSALS="${PROPOSALS}search-filter|"
+          fi
+
+          # Pattern 3: Scoring/recommendation improvements → catalog enhancement
+          if echo "$MESSAGES" | grep -qi "layer.*boost\|confidence\|scoring\|recommend"; then
+            PROPOSALS="${PROPOSALS}recommendation|"
+          fi
+
+          # Pattern 4: Report enhancements → report template improvement
+          if echo "$MESSAGES" | grep -qi "report\|dashboard\|visuali"; then
+            PROPOSALS="${PROPOSALS}reporting|"
+          fi
+
+          # Pattern 5: Data model extensions → interface enhancement
+          if echo "$MESSAGES" | grep -qi "label\|tag\|metadata\|interface.*extend"; then
+            PROPOSALS="${PROPOSALS}data-model|"
+          fi
+
+          # Pattern 6: CLI enhancements → CLI framework improvement
+          if echo "$MESSAGES" | grep -qi "cli.*command\|new.*command\|flag\|option"; then
+            PROPOSALS="${PROPOSALS}cli|"
+          fi
+
+          echo "proposals=$PROPOSALS" >> $GITHUB_OUTPUT
+
+          if [ -z "$PROPOSALS" ]; then
+            echo "found=false" >> $GITHUB_OUTPUT
+          else
+            echo "found=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build proposal body
+        if: steps.detect.outputs.found == 'true'
+        id: body
+        env:
+          PROPOSALS: ${{ steps.detect.outputs.proposals }}
+          MESSAGES: ${{ steps.changes.outputs.messages }}
+          FILES: ${{ steps.changes.outputs.files }}
+          REPO_URL: https://github.com/${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+
+          BODY="## Feature Proposal from oh-my-teammates\n\n"
+          BODY+="**Source**: oh-my-teammates v${VERSION}\n"
+          BODY+="**Commit**: ${REPO_URL}/commit/${COMMIT_SHA}\n\n"
+          BODY+="### Detected Patterns\n\n"
+
+          if echo "$PROPOSALS" | grep -q "security"; then
+            BODY+="#### Security Pattern\n"
+            BODY+="oh-my-teammates applied security hardening (e.g., SQL parameterization).\n"
+            BODY+="**Action**: Audit similar patterns in oh-my-customcode modules.\n\n"
+          fi
+
+          if echo "$PROPOSALS" | grep -q "search-filter"; then
+            BODY+="#### Search/Filter Pattern\n"
+            BODY+="New search or filtering capability added.\n"
+            BODY+="**Action**: Consider extracting as a shared utility or adding to core.\n\n"
+          fi
+
+          if echo "$PROPOSALS" | grep -q "recommendation"; then
+            BODY+="#### Recommendation Enhancement\n"
+            BODY+="Agent recommendation scoring improved.\n"
+            BODY+="**Action**: Evaluate if agent-catalog scoring in oh-my-customcode could benefit.\n\n"
+          fi
+
+          if echo "$PROPOSALS" | grep -q "reporting"; then
+            BODY+="#### Reporting Enhancement\n"
+            BODY+="Report generation improved with new filters or data.\n"
+            BODY+="**Action**: Consider for shared report template improvements.\n\n"
+          fi
+
+          if echo "$PROPOSALS" | grep -q "data-model"; then
+            BODY+="#### Data Model Extension\n"
+            BODY+="Data interfaces extended with new fields.\n"
+            BODY+="**Action**: Evaluate if core interfaces should be updated.\n\n"
+          fi
+
+          if echo "$PROPOSALS" | grep -q "cli"; then
+            BODY+="#### CLI Enhancement\n"
+            BODY+="New CLI commands or options added.\n"
+            BODY+="**Action**: Consider for CLI framework improvements in oh-my-customcode.\n\n"
+          fi
+
+          BODY+="### Source Changes\n\n"
+          BODY+="**Commits**:\n"
+          echo "$MESSAGES" | tr '|' '\n' | while read -r msg; do
+            [ -n "$msg" ] && BODY+="- ${msg}\n"
+          done
+
+          BODY+="\n**Files**: $(echo "$FILES" | wc -w | tr -d ' ') changed\n\n"
+          BODY+="---\n*Auto-generated by [propose-upstream](${REPO_URL}/actions) workflow.*"
+
+          # Write to file to handle multiline
+          echo -e "$BODY" > /tmp/proposal-body.md
+
+      - name: Check for existing proposal
+        if: steps.detect.outputs.found == 'true'
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_PAT }}
+        run: |
+          EXISTING=$(gh issue list \
+            --repo "$UPSTREAM_REPO" \
+            --search "oh-my-teammates proposal" \
+            --state open \
+            --json number \
+            --jq length 2>/dev/null || echo "0")
+
+          # Limit: max 2 open proposals at a time to avoid spam
+          if [ "$EXISTING" -gt "2" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Too many open proposals ($EXISTING), skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create upstream issue
+        if: >
+          steps.detect.outputs.found == 'true' &&
+          steps.existing.outputs.skip != 'true' &&
+          inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_PAT }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          SHA_SHORT=$(echo "$COMMIT_SHA" | cut -c1-7)
+
+          gh issue create \
+            --repo "$UPSTREAM_REPO" \
+            --title "upstream: oh-my-teammates proposal ($SHA_SHORT)" \
+            --body-file /tmp/proposal-body.md \
+            --label "upstream-proposal,automated"
+
+      - name: Dry run output
+        if: >
+          steps.detect.outputs.found == 'true' &&
+          inputs.dry_run == 'true'
+        env:
+          PROPOSALS: ${{ steps.detect.outputs.proposals }}
+        run: |
+          echo "=== DRY RUN ==="
+          echo "Would create issue in $UPSTREAM_REPO"
+          echo ""
+          echo "=== Proposals ==="
+          echo "$PROPOSALS"
+          echo ""
+          echo "=== Body ==="
+          cat /tmp/proposal-body.md
+
+      - name: No proposals found
+        if: steps.detect.outputs.found != 'true'
+        run: echo "No proposable patterns detected in this push."

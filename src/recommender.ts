@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, extname, join, resolve } from 'node:path';
 import type { AgentCatalogEntry, AgentCategory } from './agent-catalog';
@@ -21,6 +22,7 @@ export interface AgentRecommendation {
 export interface RecommendOptions {
   minConfidence?: number;
   category?: AgentCategory;
+  sessionsDbPath?: string;
 }
 
 interface ScanResult {
@@ -54,13 +56,14 @@ const MANIFEST_FILES = [
 
 export class Recommender {
   private basePath: string;
+  private spawnFrequencyCache: Map<string, number> | null = null;
 
   constructor(basePath = '.') {
     this.basePath = basePath;
   }
 
   recommend(options: RecommendOptions = {}): AgentRecommendation[] {
-    const { minConfidence = 0.3, category } = options;
+    const { minConfidence = 0.3, category, sessionsDbPath } = options;
 
     const scan = this.scanFiles();
     const manifests = this.parseManifests();
@@ -68,7 +71,7 @@ export class Recommender {
     const results: AgentRecommendation[] = [];
 
     for (const entry of AGENT_CATALOG) {
-      const { confidence, reasons } = this.scoreAgent(entry, scan, manifests);
+      const { confidence, reasons } = this.scoreAgent(entry, scan, manifests, sessionsDbPath);
 
       if (confidence < minConfidence) {
         continue;
@@ -177,12 +180,49 @@ export class Recommender {
     return results;
   }
 
+  // ── Private: session frequency ────────────────────────────────────────────
+
+  private readSpawnFrequency(dbPath: string): Map<string, number> {
+    if (this.spawnFrequencyCache !== null) {
+      return this.spawnFrequencyCache;
+    }
+
+    const cache = new Map<string, number>();
+
+    try {
+      const db = new Database(dbPath, { readonly: true });
+
+      try {
+        const rows = db
+          .prepare(
+            `SELECT json_extract(data, '$.agent') AS agent, COUNT(*) AS count
+             FROM session_events
+             WHERE type = 'agent_spawn' AND json_extract(data, '$.agent') IS NOT NULL
+             GROUP BY agent`,
+          )
+          .all() as { agent: string; count: number }[];
+
+        for (const row of rows) {
+          cache.set(row.agent, row.count);
+        }
+      } finally {
+        db.close();
+      }
+    } catch {
+      // DB missing or unreadable — graceful skip
+    }
+
+    this.spawnFrequencyCache = cache;
+    return cache;
+  }
+
   // ── Private: confidence scoring ───────────────────────────────────────────
 
   private scoreAgent(
     entry: AgentCatalogEntry,
     scan: ScanResult,
     manifests: ParsedDependencies[],
+    sessionsDbPath?: string,
   ): { confidence: number; reasons: string[] } {
     let maxConfidence = 0;
     const reasons: string[] = [];
@@ -252,6 +292,17 @@ export class Recommender {
           }
           reasons.push(`${matchedPkgs.join(', ')} in ${rule.manifest}`);
         }
+      }
+    }
+
+    // Layer 5: Historical usage frequency boost
+    if (sessionsDbPath !== undefined) {
+      const frequency = this.readSpawnFrequency(sessionsDbPath);
+      const count = frequency.get(entry.name) ?? 0;
+
+      if (count > 0) {
+        maxConfidence = Math.min(maxConfidence + 0.1, 1.0);
+        reasons.push(`used ${count} time(s) in past sessions`);
       }
     }
 
