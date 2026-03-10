@@ -3,6 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Recommender } from '../recommender';
+import { SessionLogger } from '../session-logger';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -280,6 +281,108 @@ describe('Recommender', () => {
         expect(Array.isArray(rec.reasons)).toBe(true);
         expect(rec.confidence).toBeGreaterThanOrEqual(0);
         expect(rec.confidence).toBeLessThanOrEqual(1);
+      }
+    });
+  });
+
+  // ── Layer 5: frequency boost ──────────────────────────────────────────────
+
+  describe('Layer 5: frequency boost', () => {
+    it('should boost confidence for agents with spawn history', () => {
+      const dbPath = join(tmpDir, 'sessions.db');
+      const logger = new SessionLogger(dbPath);
+      logger.startSession('alice', 'main');
+      logger.logEvent('agent_spawn', { agent: 'lang-typescript-expert' });
+      logger.logEvent('agent_spawn', { agent: 'lang-typescript-expert' });
+      logger.endSession();
+      logger.close();
+
+      const projectDir = join(tmpDir, 'project');
+      mkdirSync(projectDir);
+      for (let i = 0; i < 5; i++) {
+        writeFileSync(join(projectDir, `file${i}.ts`), '// test');
+      }
+
+      const recommender = new Recommender(projectDir);
+
+      const withoutBoost = recommender.recommend({ minConfidence: 0.01 });
+      const tsEntryWithout = withoutBoost.find((r) => r.agent === 'lang-typescript-expert');
+
+      // Use a fresh Recommender to avoid cache
+      const recommenderWithBoost = new Recommender(projectDir);
+      const withBoost = recommenderWithBoost.recommend({
+        minConfidence: 0.01,
+        sessionsDbPath: dbPath,
+      });
+      const tsEntryWith = withBoost.find((r) => r.agent === 'lang-typescript-expert');
+
+      expect(tsEntryWith).toBeDefined();
+      expect(tsEntryWithout).toBeDefined();
+      if (tsEntryWith !== undefined && tsEntryWithout !== undefined) {
+        expect(tsEntryWith.confidence).toBeGreaterThan(tsEntryWithout.confidence);
+        expect(tsEntryWith.reasons).toContain('used 2 time(s) in past sessions');
+      }
+    });
+
+    it('should cap confidence at 1.0', () => {
+      const dbPath = join(tmpDir, 'sessions-cap.db');
+      const logger = new SessionLogger(dbPath);
+      logger.startSession('alice', 'main');
+      logger.logEvent('agent_spawn', { agent: 'lang-typescript-expert' });
+      logger.endSession();
+      logger.close();
+
+      const projectDir = join(tmpDir, 'project-cap');
+      mkdirSync(projectDir);
+      for (let i = 0; i < 10; i++) {
+        writeFileSync(join(projectDir, `file${i}.ts`), '// test');
+      }
+      writeFileSync(join(projectDir, 'tsconfig.json'), '{}');
+
+      const recommender = new Recommender(projectDir);
+      const results = recommender.recommend({ minConfidence: 0.01, sessionsDbPath: dbPath });
+      const tsEntry = results.find((r) => r.agent === 'lang-typescript-expert');
+
+      expect(tsEntry).toBeDefined();
+      if (tsEntry !== undefined) {
+        expect(tsEntry.confidence).toBeLessThanOrEqual(1.0);
+      }
+    });
+
+    it('should skip gracefully when DB is missing', () => {
+      const projectDir = join(tmpDir, 'project-missing');
+      mkdirSync(projectDir);
+      writeFileSync(join(projectDir, 'file.ts'), '// test');
+
+      const recommender = new Recommender(projectDir);
+      const results = recommender.recommend({ sessionsDbPath: '/nonexistent/path/sessions.db' });
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it('should not boost agents without spawn history', () => {
+      const dbPath = join(tmpDir, 'sessions-noagent.db');
+      const logger = new SessionLogger(dbPath);
+      logger.startSession('alice', 'main');
+      logger.logEvent('agent_spawn', { agent: 'some-other-agent' });
+      logger.endSession();
+      logger.close();
+
+      const projectDir = join(tmpDir, 'project-noboost');
+      mkdirSync(projectDir);
+      for (let i = 0; i < 5; i++) {
+        writeFileSync(join(projectDir, `file${i}.ts`), '// test');
+      }
+
+      const withoutBoostRec = new Recommender(projectDir);
+      const withoutBoost = withoutBoostRec.recommend({ minConfidence: 0.01 });
+      const tsWithout = withoutBoost.find((r) => r.agent === 'lang-typescript-expert');
+
+      const withBoostRec = new Recommender(projectDir);
+      const withBoost = withBoostRec.recommend({ minConfidence: 0.01, sessionsDbPath: dbPath });
+      const tsWithBoost = withBoost.find((r) => r.agent === 'lang-typescript-expert');
+
+      if (tsWithBoost !== undefined && tsWithout !== undefined) {
+        expect(tsWithBoost.confidence).toBe(tsWithout.confidence);
       }
     });
   });

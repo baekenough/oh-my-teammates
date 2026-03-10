@@ -9,16 +9,19 @@ export interface TodoItem {
   assignee: string | null;
   domain: string | null;
   completed: boolean;
+  labels?: string[];
 }
 
 /**
  * Each TODO line format:
- *   ## {scope}: [{priority}] {description} — @{assignee} ({domain})
+ *   ## {scope}: [{priority}] {description} — @{assignee} ({domain}) [label1, label2]
  * Completed items are prefixed with "~~" and suffixed with "~~":
- *   ## ~~{scope}: [{priority}] {description} — @{assignee} ({domain})~~
+ *   ## ~~{scope}: [{priority}] {description} — @{assignee} ({domain}) [label1, label2]~~
+ *
+ * Labels are an optional trailing bracket group after the assignee/domain section.
  */
 const TODO_LINE_RE =
-  /^##\s+(?:~~)?(\w+):\s+\[(P[012])\]\s+(.+?)(?:\s+—\s+@([\w-]+)(?:\s+\(([^)]+)\))?)?(?:~~)?$/;
+  /^##\s+(?:~~)?(\w+):\s+\[(P[012])\]\s+(.+?)(?:\s+—\s+@([\w-]+)(?:\s+\(([^)]+)\))?)?(?:\s+\[([^\]]*)\])?(?:~~)?$/;
 
 function parseLine(line: string): TodoItem | null {
   const trimmed = line.trim();
@@ -42,13 +45,30 @@ function parseLine(line: string): TodoItem | null {
     return null;
   }
 
+  const description = (match[3] ?? '').trim();
+  const assignee = match[4] ?? null;
+  const domain = match[5] ?? null;
+
+  let labels: string[] | undefined;
+  const labelsStr = match[6];
+  if (labelsStr !== undefined) {
+    const parsed = labelsStr
+      .split(',')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    if (parsed.length > 0) {
+      labels = parsed;
+    }
+  }
+
   return {
     scope,
     priority,
-    description: (match[3] ?? '').trim(),
-    assignee: match[4] ?? null,
-    domain: match[5] ?? null,
+    description,
+    assignee,
+    domain,
     completed,
+    ...(labels !== undefined ? { labels } : {}),
   };
 }
 
@@ -59,6 +79,9 @@ function serializeItem(item: TodoItem): string {
     if (item.domain !== null) {
       line += ` (${item.domain})`;
     }
+  }
+  if (item.labels !== undefined && item.labels.length > 0) {
+    line += ` [${item.labels.join(', ')}]`;
   }
   if (item.completed) {
     line = `## ~~${line.slice(3)}~~`;
@@ -128,8 +151,13 @@ export class TeamTodo {
     return true;
   }
 
-  /** Return items, optionally filtered by scope, priority, or assignee. */
-  list(filter?: { scope?: 'team' | 'personal'; priority?: string; assignee?: string }): TodoItem[] {
+  /** Return items, optionally filtered by scope, priority, assignee, or label. */
+  list(filter?: {
+    scope?: 'team' | 'personal';
+    priority?: string;
+    assignee?: string;
+    label?: string;
+  }): TodoItem[] {
     if (!filter) {
       return [...this.items];
     }
@@ -142,6 +170,9 @@ export class TeamTodo {
         return false;
       }
       if (filter.assignee !== undefined && item.assignee !== filter.assignee) {
+        return false;
+      }
+      if (filter.label !== undefined && !(item.labels?.includes(filter.label) ?? false)) {
         return false;
       }
       return true;
