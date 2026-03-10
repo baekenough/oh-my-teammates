@@ -26,6 +26,8 @@ Like oh-my-customcode gave you a personal agent stack, oh-my-teammates makes it 
 | `stewards.ts` | `STEWARDS.yaml` management with 8-domain model and CODEOWNERS generation |
 | `init.ts` | Project scanning, dependency analysis, and team configuration scaffolding |
 | `team-todo.ts` | Team-level task management with priority levels and steward-based auto-assignment |
+| `recommender.ts` | Project scanning engine with 4-layer confidence scoring for agent recommendations |
+| `report.ts` | Static HTML report generator aggregating team, steward, session, and TODO data |
 | `cli.ts` | `omcustom-team init` and `omcustom-team todo` CLI commands |
 | Dashboard | SvelteKit-based agent/skill/rule/guide visualization with dark mode and mobile support |
 
@@ -39,6 +41,66 @@ Like oh-my-customcode gave you a personal agent stack, oh-my-teammates makes it 
 | **Team TODO** | Shared task management linked to stewards and issues |
 | **Quality Metrics** | Rule Adherence Rate (RAR) tracking, target 98% |
 | **Adaptive Expansion** | Auto-detect tech stack changes and recommend new agents/skills |
+| **Agent Recommender** | Scan project structure and recommend relevant agents based on tech stack |
+| **HTML Report** | Aggregate team data into a static dashboard report |
+
+## How Stewards Work
+
+Stewards are **domain guardians** — they declare "who is responsible for what" across your codebase. Instead of manually editing `.github/CODEOWNERS`, you define ownership at the **domain level** in `STEWARDS.yaml`.
+
+### The Problem Stewards Solve
+
+| Without Stewards | With Stewards |
+|------------------|---------------|
+| Manually edit `.github/CODEOWNERS` per file | Define ownership per **domain** → CODEOWNERS auto-generated |
+| "Who should review this PR?" → ask around | `findStewardForFile("src/api/auth.ts")` → `alice` |
+| TODO tasks manually assigned | Domain-based auto-assignment via `autoAssign()` |
+| No visibility into coverage gaps | Report shows unowned domains |
+
+### How It Works
+
+```
+STEWARDS.yaml                        .github/CODEOWNERS
+┌──────────────────────┐             ┌──────────────────────────┐
+│ domains:             │             │ # Auto-generated          │
+│   frontend:          │  ────────►  │ /src/components/** @carol │
+│     primary: carol   │  generate   │ /**/*.svelte @carol @dave │
+│     backup: dave     │  Codeowners │                           │
+│     paths:           │             │ /src/api/** @alice @bob   │
+│       - src/comp/**  │             └──────────────────────────┘
+│       - **/*.svelte  │
+│   backend:           │             TODO.md (auto-assign)
+│     primary: alice   │             ┌──────────────────────────┐
+│     backup: bob      │  ────────►  │ [P0] Fix auth — @alice   │
+│     paths:           │  autoAssign │   (backend domain)       │
+│       - src/api/**   │             │ [P1] Update UI — @carol  │
+└──────────────────────┘             │   (frontend domain)      │
+                                     └──────────────────────────┘
+```
+
+### File → Domain → Steward Mapping
+
+When a file is changed, Stewards traces the chain:
+
+```
+src/components/Button.tsx → frontend domain → carol (primary), dave (backup)
+dags/daily_etl.py        → data-engineering  → dave (primary)
+Dockerfile               → infrastructure    → eve (primary)
+src/api/auth.ts          → backend domain    → alice (primary), bob (backup)
+```
+
+### 8 Default Domains
+
+| Domain | Scope | Example Patterns |
+|--------|-------|-----------------|
+| `languages` | Language-specific code | `**/*.ts`, `**/*.py`, `**/*.go` |
+| `frontend` | UI components & frameworks | `src/components/**`, `**/*.svelte` |
+| `backend` | Server & API code | `src/api/**`, `routes/**` |
+| `data-engineering` | Pipelines & DAGs | `dags/**`, `pipelines/**` |
+| `infrastructure` | Deploy & CI/CD | `Dockerfile`, `terraform/**` |
+| `database` | Schema & migrations | `**/*.sql`, `migrations/**` |
+| `quality` | Tests & specs | `**/*.test.ts`, `__tests__/**` |
+| `documentation` | Docs & guides | `docs/**`, `**/*.md` |
 
 ## Quick Start
 
@@ -76,6 +138,16 @@ bunx omcustom-team todo list
 # Add a new team task
 bunx omcustom-team todo add Fix API rate limiting
 ```
+
+### `omcustom-team recommend`
+
+Scan your project and recommend agents:
+
+```bash
+bunx omcustom-team recommend
+```
+
+Analyzes file extensions, config files, directory patterns, and manifest dependencies to suggest the most relevant oh-my-customcode agents for your tech stack.
 
 ## Dashboard
 
@@ -227,9 +299,9 @@ bun run build        # Build for production
 | Phase | Feature | Status |
 |-------|---------|--------|
 | V1 | Guardian CI, Session Logging, Stewards, Team TODO | **Shipped (v0.2.0)** |
-| V1.5 | Static HTML report (`omcustom-team report`) | Planned |
-| V2 | Dashboard enhancements — ontology graph, session timeline, RAR metrics | Planned |
-| V3 | Adaptive Expansion -- auto-detect and recommend | Planned |
+| V1.5 | Static HTML report (`omcustom-team report`) | **Shipped (v0.5.0)** |
+| V2 | Dashboard enhancements — ontology graph, session timeline, RAR metrics | **Shipped (v0.5.0)** |
+| V3 | Adaptive Expansion -- auto-detect and recommend | **Shipped (v0.5.0)** |
 
 ## Related
 

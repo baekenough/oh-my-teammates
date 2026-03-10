@@ -1,6 +1,6 @@
 # 아키텍처 가이드 — oh-my-teammates
 
-> Version 0.2.0 | Runtime: Bun | Language: TypeScript (strict mode)
+> Version 0.5.1 | Runtime: Bun | Language: TypeScript (strict mode)
 
 ## 개요
 
@@ -13,43 +13,53 @@
 - **프로젝트 스캐폴딩** — 자동 프로젝트 스캔 및 설정 부트스트랩
 - **CLI** — 일상적인 팀 운영을 위한 `omcustom-team` 바이너리
 - **대시보드** — 팀의 에이전트/스킬/규칙 인벤토리를 위한 SvelteKit 시각화 레이어
+- **에이전트 추천** — 기술 스택 분석을 위한 4계층 신뢰도 점수 엔진 (`recommender.ts`)
+- **리포트 생성** — 팀, 세션, 스튜어드, TODO 데이터를 집계하는 정적 HTML 리포트 (`report.ts`)
 
 ## 시스템 아키텍처
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       omcustom-team CLI                         │
-│                           (cli.ts)                              │
-│         omcustom-team init   |   omcustom-team todo             │
-├──────────────────────────────┬──────────────────────────────────┤
-│                              │                                  │
-│  ┌───────────────────┐       │    ┌───────────────────────┐    │
-│  │    TeamConfig     │       │    │    SessionLogger       │    │
-│  │  (team-config.ts) │       │    │  (session-logger.ts)  │    │
-│  │                   │       │    │    bun:sqlite WAL      │    │
-│  │  team.yaml CRUD   │       │    │  sessions + events    │    │
-│  └───────────────────┘       │    └───────────────────────┘    │
-│                              │                                  │
-│  ┌───────────────────┐       │    ┌───────────────────────┐    │
-│  │     Stewards      │◄──────┘    │      TeamTodo         │    │
-│  │   (stewards.ts)   │            │   (team-todo.ts)      │    │
-│  │                   │◄───────────│                       │    │
-│  │ STEWARDS.yaml +   │  autoAssign│  TODO.md 파싱 +       │    │
-│  │ CODEOWNERS 생성   │            │  우선순위 관리         │    │
-│  └───────────────────┘            └───────────────────────┘    │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                        init.ts                          │   │
-│  │   scanProject() → scaffoldTeamDir() → createTemplate()  │   │
-│  │   감지: 언어, 프레임워크, 의존성 매니페스트               │   │
-│  └─────────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────────┤
-│                   공개 API (index.ts)                           │
-│     TeamConfig | SessionLogger | Stewards | TeamTodo            │
-├─────────────────────────────────────────────────────────────────┤
-│                    SvelteKit 대시보드                           │
-│          dashboard/ → adapter-static → GitHub Pages             │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                          omcustom-team CLI                           │
+│                              (cli.ts)                                │
+│      init  │  todo  │  recommend  │  report  │  status               │
+├────────────┴────────┴─────────────┴──────────┴───────────────────────┤
+│                                                                       │
+│  ┌─────────────┐  ┌──────────┐  ┌───────────────┐  ┌─────────────┐  │
+│  │ TeamConfig  │  │ Stewards │  │ SessionLogger │  │  TeamTodo   │  │
+│  │ team.yaml   │  │STEWARDS  │  │  bun:sqlite   │  │  TODO.md    │  │
+│  │ CRUD +      │  │.yaml +   │  │  WAL mode     │  │  priority + │  │
+│  │ validation  │←→│CODEOWNERS│←─│  sessions +   │  │  auto-      │  │
+│  └─────────────┘  │generation│  │  events       │  │  assign     │──┤
+│                    └─────┬───┘  └───────────────┘  └─────────────┘  │
+│                          │              │                  │          │
+│                          │              ▼                  │          │
+│  ┌─────────────┐         │    ┌───────────────┐           │          │
+│  │ Recommender │         │    │ReportGenerator│◄──────────┘          │
+│  │ 4-layer     │         │    │ HTML output   │                      │
+│  │ scoring     │         └───►│ aggregates    │                      │
+│  │             │              │ all modules   │                      │
+│  └──────┬──────┘              └───────────────┘                      │
+│         │                                                             │
+│  ┌──────┴──────┐  ┌──────────────┐                                   │
+│  │AgentCatalog │  │ManifestParser│                                   │
+│  │ 41 agents   │  │ package.json │                                   │
+│  │ detection   │  │ go.mod, etc  │                                   │
+│  │ rules       │  │              │                                   │
+│  └─────────────┘  └──────────────┘                                   │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │                          init.ts                              │   │
+│  │   scanProject() → scaffoldTeamDir() → scaffoldClaudeMd()      │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+├───────────────────────────────────────────────────────────────────────┤
+│                        Public API (index.ts)                          │
+│  TeamConfig │ SessionLogger │ Stewards │ TeamTodo │ Recommender       │
+│  ReportGenerator │ AgentCatalog │ ManifestParser                      │
+├───────────────────────────────────────────────────────────────────────┤
+│                       SvelteKit 대시보드                              │
+│             dashboard/ → adapter-static → GitHub Pages                │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 핵심 모듈
@@ -200,6 +210,100 @@ interface TodoItem {
 
 ---
 
+## 스튜어드 개념 심층 분석
+
+### 목적
+
+스튜어드는 팀의 근본적인 질문에 답합니다: **"이 코드의 책임자는 누구인가?"**
+
+CODEOWNERS를 파일 수준에서 수동으로 관리하는 대신, 스튜어드는 **도메인 추상화 레이어**를 도입합니다. 도메인 수준에서 소유권을 선언하면, 시스템이 파일-소유자 매핑을 자동으로 처리합니다.
+
+### 핵심 가치 제안
+
+| 관점 | 기존 방식 (CODEOWNERS) | 스튜어드 시스템 |
+|------|----------------------|----------------|
+| 세분화 | 파일/디렉토리 경로 | **도메인** (8개 시맨틱 카테고리) |
+| 유지보수 | 수동 편집, 쉽게 오래됨 | 선언적 YAML, CODEOWNERS 자동 생성 |
+| 작업 할당 | 작업별 수동 할당 | 도메인 조회로 자동 할당 |
+| 탐색성 | CODEOWNERS를 grep | `findStewardForFile(path)` API |
+| 커버리지 가시성 | 없음 | 리포트에서 미할당 도메인 강조 |
+
+### 매핑 작동 방식
+
+```
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│   파일 변경       │     │   도메인 매치      │     │  스튜어드 확인    │
+│                   │     │                   │     │                  │
+│ src/api/auth.ts   │────►│ backend           │────►│ primary: alice   │
+│                   │ glob│ (src/api/**)       │     │ backup:  bob     │
+└──────────────────┘매치  └──────────────────┘     └──────────────────┘
+```
+
+`findStewardForFile()` 메서드:
+1. `STEWARDS.yaml`의 모든 도메인을 순회
+2. 각 도메인에 대해 파일 경로를 `paths[]`의 모든 glob 패턴과 비교
+3. 첫 번째로 매칭되는 도메인의 `primary`와 `backup` 스튜어드 반환
+4. 매칭되는 도메인이 없으면 `undefined` 반환 (커버리지 갭)
+
+### 통합 지점
+
+```
+STEWARDS.yaml ─────────────────────────────────┐
+     │                                          │
+     ├─► generateCodeowners()                   │
+     │     └─► .github/CODEOWNERS               │
+     │           └─► GitHub가 자동으로           │
+     │               PR 리뷰어 지정              │
+     │                                          │
+     ├─► TeamTodo.autoAssign()                  │
+     │     └─► 도메인은 있지만 담당자 없는       │
+     │         TODO 항목에 primary 스튜어드 할당  │
+     │                                          │
+     ├─► ReportGenerator                        │
+     │     └─► 커버리지 갭 분석                  │
+     │         (스튜어드 없는 도메인)             │
+     │                                          │
+     └─► findStewardForFile(path)               │
+           └─► 런타임 조회: "이 파일 소유자?"    │
+```
+
+### 실제 예시
+
+다음 `STEWARDS.yaml`이 주어졌을 때:
+
+```yaml
+stewards:
+  version: "1.0"
+  domains:
+    frontend:
+      primary: carol
+      backup: dave
+      paths:
+        - src/components/**
+        - "**/*.svelte"
+        - "**/*.tsx"
+    backend:
+      primary: alice
+      backup: bob
+      paths:
+        - src/api/**
+        - src/server/**
+```
+
+**시나리오 1: PR 리뷰**
+PR이 `src/api/auth.ts`를 수정 → Stewards가 CODEOWNERS 생성 → GitHub이 `@alice`와 `@bob`을 리뷰어로 자동 지정.
+
+**시나리오 2: TODO 자동 할당**
+```
+전: ## team: [P0] Fix auth bug — (backend)     ← 담당자 없음
+후: ## team: [P0] Fix auth bug — @alice (backend) ← 자동 할당됨
+```
+
+**시나리오 3: 커버리지 갭 감지**
+`data-engineering` 도메인의 `primary: null`이면, 리포트에서 주의가 필요한 미할당 도메인으로 표시합니다.
+
+---
+
 ### init (`src/init.ts`)
 
 프로젝트 스캔 및 부트스트랩 진입점입니다.
@@ -236,6 +340,60 @@ interface TodoItem {
 
 **종료 코드:** 필수 인수 누락 또는 `init` 전에 `list` 호출 시 코드 `1`로 종료.
 
+---
+
+### Recommender (`src/recommender.ts`)
+
+프로젝트 디렉토리를 스캔하고 기술 스택 분석을 기반으로 순위가 매겨진 에이전트 추천 목록을 생성합니다.
+
+**주요 타입:**
+
+```typescript
+interface AgentRecommendation {
+  agent: string;         // Agent name from catalog
+  category: AgentCategory;
+  description: string;
+  confidence: number;    // 0.0 - 1.0
+  reasons: string[];     // Human-readable match reasons
+}
+```
+
+**4계층 신뢰도 점수:**
+
+| 계층 | 신호 | 최대 신뢰도 | 예시 |
+|------|------|------------|------|
+| 1. 파일 확장자 | `*.ts`, `*.py`, `*.go` | 0.5 | "42 .ts files found" |
+| 2. 설정 파일 | `tsconfig.json`, `Cargo.toml` | 0.8 | "tsconfig.json found" |
+| 3. 디렉토리 패턴 | `dags/`, `migrations/` | 0.6 | "dags/ directory found" |
+| 4. 매니페스트 의존성 | `react` in package.json | 0.9 | "react, next in package.json" |
+
+**점수 알고리즘:** 각 계층이 신뢰도 점수를 생성합니다. 최종 신뢰도는 `max(모든 계층 점수)`이며 1.0으로 제한됩니다. 상위 계층(의존성)이 존재하면 하위 계층(확장자)을 덮어씁니다.
+
+**데이터 흐름:** `scanFiles()` → `parseManifests()` → 카탈로그 항목별 `scoreAgent()` → 신뢰도 순 정렬 → `minConfidence`로 필터링
+
+---
+
+### ReportGenerator (`src/report.ts`)
+
+모든 핵심 모듈의 데이터를 집계하여 독립형 정적 HTML 리포트를 생성합니다.
+
+**데이터 소스:**
+
+| 소스 | 수집 데이터 |
+|------|------------|
+| `TeamConfig` | 팀 이름, 멤버 목록 |
+| `Stewards` | 도메인 소유권 맵, 커버리지 갭 |
+| `TeamTodo` | 미완료/완료 항목, 우선순위 분포 |
+| `SessionLogger` | 최근 세션, 이벤트 통계, 사용자 활동 |
+
+**리포트 섹션:** 팀 개요, 도메인 스튜어드십 매트릭스, TODO 요약, 세션 활동, 커버리지 갭 분석.
+
+**출력:** `.claude/team/report.html`에 단일 `.html` 파일 생성 (설정 가능). 외부 의존성 없음 — 모든 CSS/JS가 인라인으로 포함됩니다.
+
+**점진적 성능 저하:** 각 데이터 소스는 독립적으로 수집됩니다. `team.yaml`이 없어도 사용 가능한 데이터로 리포트를 생성합니다. 단일 파일 누락이 리포트 생성을 막지 않습니다.
+
+---
+
 ## 데이터 흐름
 
 ```
@@ -271,6 +429,26 @@ Stewards.writeCodeowners()
   │
   ├─ generateCodeowners() → 각 도메인의 경로 + 소유자 포맷
   └─ .github/CODEOWNERS에 작성
+
+Recommender.recommend()
+  │
+  ├─ scanFiles()
+  │     walk project tree → collect extensions, config files, directories
+  │
+  ├─ parseManifests()
+  │     detect package.json, go.mod, etc. → extract dependencies
+  │
+  └─ scoreAgent() × N catalog entries
+        4-layer scoring → sort by confidence → return recommendations
+
+ReportGenerator.generate()
+  │
+  ├─ collectTeamConfig()    → team.yaml data
+  ├─ collectDomains()       → STEWARDS.yaml data
+  ├─ collectTodos()         → TODO.md items
+  ├─ collectSessionData()   → SQLite session stats
+  ├─ computeCoverageGaps()  → unowned domains
+  └─ generateReportHtml()   → single HTML file output
 ```
 
 ## 대시보드
