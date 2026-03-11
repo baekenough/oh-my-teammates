@@ -163,7 +163,7 @@ export const AGENT_CATALOG: AgentCatalogEntry[] = [
     },
   },
 
-  // ── Frontend (3) ────────────────────────────────────────────────────────────
+  // ── Frontend (4) ────────────────────────────────────────────────────────────
   {
     name: 'fe-vercel-agent',
     category: 'frontend',
@@ -197,6 +197,17 @@ export const AGENT_CATALOG: AgentCatalogEntry[] = [
       dependencies: [
         { manifest: 'package.json', packages: ['svelte', '@sveltejs/kit'], confidence: 0.95 },
       ],
+    },
+  },
+  {
+    name: 'fe-flutter-agent',
+    category: 'frontend',
+    description: 'Flutter/Dart applications',
+    detection: {
+      fileExtensions: ['.dart'],
+      configFiles: ['pubspec.yaml'],
+      directoryPatterns: ['lib/'],
+      dependencies: [{ manifest: 'pubspec.yaml', packages: ['flutter'], confidence: 0.95 }],
     },
   },
 

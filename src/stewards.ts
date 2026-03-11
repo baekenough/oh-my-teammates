@@ -20,7 +20,7 @@ export interface StewardsData {
 }
 
 export const DEFAULT_DOMAINS: Record<string, string[]> = {
-  languages: ['**/*.ts', '**/*.py', '**/*.go', '**/*.kt', '**/*.rs', '**/*.java'],
+  languages: ['**/*.ts', '**/*.py', '**/*.go', '**/*.kt', '**/*.rs', '**/*.java', '**/*.dart'],
   frontend: ['src/components/**', 'dashboard/**', '**/*.svelte', '**/*.vue', '**/*.tsx'],
   backend: ['src/api/**', 'src/server/**', 'routes/**'],
   'data-engineering': ['dags/**', 'pipelines/**', 'models/**'],

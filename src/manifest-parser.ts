@@ -1,8 +1,9 @@
 /**
  * Parsers for various dependency manifest files.
  * Extracts package names from package.json, go.mod, pyproject.toml,
- * requirements.txt, Cargo.toml, build.gradle, and pom.xml.
+ * requirements.txt, Cargo.toml, build.gradle, pom.xml, and pubspec.yaml.
  */
+import { parse as parseYaml } from 'yaml';
 
 export interface ParsedDependencies {
   manifest: string; // e.g., "package.json"
@@ -391,6 +392,51 @@ export function parsePomXml(content: string): ParsedDependencies {
   }
 }
 
+// ── pubspec.yaml ──────────────────────────────────────────────────────────────
+
+/**
+ * Parse a pubspec.yaml file (Flutter/Dart).
+ * - dependencies keys → packages (SDK deps like `flutter: { sdk: flutter }` are skipped)
+ * - dev_dependencies keys → devPackages (SDK deps skipped)
+ */
+export function parsePubspecYaml(content: string): ParsedDependencies {
+  try {
+    const parsed: unknown = parseYaml(content);
+    if (!isObject(parsed)) {
+      return empty('pubspec.yaml');
+    }
+
+    const packages = extractPubspecDeps(parsed, 'dependencies');
+    const devPackages = extractPubspecDeps(parsed, 'dev_dependencies');
+
+    return {
+      manifest: 'pubspec.yaml',
+      packages: unique(packages),
+      devPackages: unique(devPackages),
+    };
+  } catch {
+    return empty('pubspec.yaml');
+  }
+}
+
+/** Extract non-SDK dependency names from a pubspec section. */
+function extractPubspecDeps(parsed: Record<string, unknown>, key: string): string[] {
+  const section = parsed[key];
+  if (!isObject(section)) {
+    return [];
+  }
+
+  const packages: string[] = [];
+  for (const [name, value] of Object.entries(section)) {
+    // Skip SDK dependencies: `flutter: { sdk: flutter }`
+    if (isObject(value) && typeof value['sdk'] === 'string') {
+      continue;
+    }
+    packages.push(name);
+  }
+  return packages;
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 /**
@@ -416,6 +462,8 @@ export function parseManifest(filename: string, content: string): ParsedDependen
       return parseBuildGradle(content);
     case 'pom.xml':
       return parsePomXml(content);
+    case 'pubspec.yaml':
+      return parsePubspecYaml(content);
     default:
       return null;
   }
