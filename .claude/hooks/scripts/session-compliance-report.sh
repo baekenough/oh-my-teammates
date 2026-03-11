@@ -59,6 +59,7 @@ echo "────────────────────────�
 
 # Cleanup temp files (best effort)
 rm -f "$VIOLATIONS_FILE" 2>/dev/null || true
+rm -f "$TASK_COUNT_FILE" 2>/dev/null || true
 
 # CRITICAL: Always pass through input and exit 0
 echo "$input"

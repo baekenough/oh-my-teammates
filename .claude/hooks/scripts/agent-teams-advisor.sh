@@ -9,8 +9,8 @@ set -euo pipefail
 input=$(cat)
 
 # Extract task info from input
-agent_type=$(echo "$input" | jq -r '.tool_input.subagent_type // "unknown"')
-prompt_preview=$(echo "$input" | jq -r '.tool_input.description // ""' | head -c 60)
+agent_type=$(echo "$input" | jq -r '.tool_input.subagent_type // "unknown"' 2>/dev/null) || agent_type="unknown"
+prompt_preview=$(echo "$input" | jq -r '.tool_input.description // ""' 2>/dev/null | head -c 60) || prompt_preview=""
 
 # Session-scoped counter using parent PID as session identifier
 COUNTER_FILE="/tmp/.claude-task-count-${PPID}"
