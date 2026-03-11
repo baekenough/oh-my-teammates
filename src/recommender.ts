@@ -52,6 +52,7 @@ const MANIFEST_FILES = [
   'build.gradle',
   'build.gradle.kts',
   'pom.xml',
+  'pubspec.yaml',
 ];
 
 export class Recommender {

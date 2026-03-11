@@ -246,6 +246,26 @@ describe('Recommender', () => {
     });
   });
 
+  // ── Flutter project ───────────────────────────────────────────────────────
+
+  describe('Flutter project detection', () => {
+    it('recommends fe-flutter-agent for a Flutter project', () => {
+      writeFileSync(
+        join(tmpDir, 'pubspec.yaml'),
+        'name: my_app\ndependencies:\n  flutter:\n    sdk: flutter\n',
+      );
+      mkdirSync(join(tmpDir, 'lib'), { recursive: true });
+      writeFileSync(join(tmpDir, 'lib', 'main.dart'), 'void main() {}');
+
+      const recommender = new Recommender(tmpDir);
+      const results = recommender.recommend();
+
+      const flutterRec = results.find((r) => r.agent === 'fe-flutter-agent');
+      expect(flutterRec).toBeDefined();
+      expect(flutterRec?.confidence).toBeGreaterThanOrEqual(0.3);
+    });
+  });
+
   // ── Go project ────────────────────────────────────────────────────────────
 
   describe('Go project detection', () => {

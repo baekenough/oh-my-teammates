@@ -6,6 +6,7 @@ import {
   parseManifest,
   parsePackageJson,
   parsePomXml,
+  parsePubspecYaml,
   parsePyprojectToml,
   parseRequirementsTxt,
 } from '../manifest-parser';
@@ -453,6 +454,87 @@ describe('parsePomXml', () => {
   });
 });
 
+// ── parsePubspecYaml ─────────────────────────────────────────────────────────
+
+describe('parsePubspecYaml', () => {
+  it('parses dependencies and dev_dependencies correctly', () => {
+    const content = `name: my_app
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^0.13.0
+  provider: ^6.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+`;
+    const result = parsePubspecYaml(content);
+    expect(result.manifest).toBe('pubspec.yaml');
+    expect(result.packages).toContain('http');
+    expect(result.packages).toContain('provider');
+    expect(result.devPackages).toContain('flutter_lints');
+  });
+
+  it('excludes SDK dependencies from packages and devPackages', () => {
+    const content = `name: my_app
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^0.13.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  mockito: ^5.0.0
+`;
+    const result = parsePubspecYaml(content);
+    expect(result.packages).not.toContain('flutter');
+    expect(result.devPackages).not.toContain('flutter_test');
+    expect(result.packages).toContain('http');
+    expect(result.devPackages).toContain('mockito');
+  });
+
+  it('returns empty result for empty pubspec', () => {
+    const result = parsePubspecYaml('');
+    expect(result.manifest).toBe('pubspec.yaml');
+    expect(result.packages).toHaveLength(0);
+    expect(result.devPackages).toHaveLength(0);
+  });
+
+  it('handles pubspec with only dependencies (no dev_dependencies)', () => {
+    const content = `name: my_app
+dependencies:
+  http: ^0.13.0
+  dio: ^5.0.0
+`;
+    const result = parsePubspecYaml(content);
+    expect(result.packages).toContain('http');
+    expect(result.packages).toContain('dio');
+    expect(result.devPackages).toHaveLength(0);
+  });
+
+  it('handles pubspec with only dev_dependencies (no dependencies)', () => {
+    const content = `name: my_app
+dev_dependencies:
+  flutter_lints: ^2.0.0
+  build_runner: ^2.0.0
+`;
+    const result = parsePubspecYaml(content);
+    expect(result.packages).toHaveLength(0);
+    expect(result.devPackages).toContain('flutter_lints');
+    expect(result.devPackages).toContain('build_runner');
+  });
+
+  it('returns empty result for invalid YAML', () => {
+    const result = parsePubspecYaml('{ this: is: not: valid: yaml: [');
+    expect(result.manifest).toBe('pubspec.yaml');
+    expect(result.packages).toHaveLength(0);
+    expect(result.devPackages).toHaveLength(0);
+  });
+});
+
 // ── parseManifest dispatcher ─────────────────────────────────────────────────
 
 describe('parseManifest', () => {
@@ -506,6 +588,13 @@ describe('parseManifest', () => {
     const content = `<project><dependencies><dependency><groupId>org.spring</groupId></dependency></dependencies></project>`;
     const result = parseManifest('pom.xml', content);
     expect(result?.manifest).toBe('pom.xml');
+  });
+
+  it('routes pubspec.yaml to parsePubspecYaml', () => {
+    const content = `name: my_app\ndependencies:\n  http: ^0.13.0\n`;
+    const result = parseManifest('pubspec.yaml', content);
+    expect(result?.manifest).toBe('pubspec.yaml');
+    expect(result?.packages).toContain('http');
   });
 
   it('returns null for unknown filename', () => {
