@@ -28,14 +28,14 @@ Like oh-my-customcode gave you a personal agent stack, oh-my-teammates makes it 
 | `team-todo.ts` | Team-level task management with priority levels and steward-based auto-assignment |
 | `recommender.ts` | Project scanning engine with 4-layer confidence scoring for agent recommendations |
 | `report.ts` | Static HTML report generator aggregating team, steward, session, and TODO data |
-| `cli.ts` | `omcustom-team init` and `omcustom-team todo` CLI commands |
+| `cli.ts` | `omcustom-team init`, `omcustom-team todo`, `omcustom-team recommend`, `omcustom-team report`, and `omcustom-team sessions` CLI commands |
 | Dashboard | SvelteKit-based agent/skill/rule/guide visualization with dark mode and mobile support |
 
 ## What It Does
 
 | Feature | Description |
 |---------|-------------|
-| **Session Sharing** | Share Claude session knowledge across team via selective symlinks |
+| **Session Sharing** | Share Claude session knowledge across team via the `.claude/team/` directory structure |
 | **Guardian CI** | Automated harness validation on every PR (~860ms) |
 | **Steward System** | Domain-based ownership with auto-assignment on init |
 | **Team TODO** | Shared task management linked to stewards and issues |
@@ -210,12 +210,7 @@ domains:
 
 ## Session Sharing
 
-Share Claude session knowledge without external infrastructure:
-
-```bash
-# Set up selective symlinks (per developer)
-bunx omcustom-team link
-```
+Share Claude session knowledge without external infrastructure. Session sharing works via the `.claude/team/` directory created by `omcustom-team init` — no additional setup required.
 
 ### What Gets Shared
 

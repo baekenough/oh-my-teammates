@@ -28,14 +28,14 @@ oh-my-customcode가 개인 에이전트 스택을 제공했다면, oh-my-teammat
 | `team-todo.ts` | 우선순위 레벨 및 스튜어드 기반 자동 할당 팀 작업 관리 |
 | `recommender.ts` | 에이전트 추천을 위한 4계층 신뢰도 점수 기반 프로젝트 스캔 엔진 |
 | `report.ts` | 팀, 스튜어드, 세션, TODO 데이터를 집계하는 정적 HTML 리포트 생성기 |
-| `cli.ts` | `omcustom-team init` 및 `omcustom-team todo` CLI 명령어 |
+| `cli.ts` | `omcustom-team init`, `omcustom-team todo`, `omcustom-team recommend`, `omcustom-team report`, `omcustom-team sessions` CLI 명령어 |
 | 대시보드 | SvelteKit 기반 에이전트/스킬/규칙/가이드 시각화, 다크모드 및 모바일 지원 |
 
 ## 기능
 
 | 기능 | 설명 |
 |------|------|
-| **세션 공유** | 선택적 심볼릭 링크를 통해 팀 간 Claude 세션 지식 공유 |
+| **세션 공유** | `.claude/team/` 디렉토리 구조를 통해 팀 간 Claude 세션 지식 공유 |
 | **Guardian CI** | PR마다 자동 하네스 무결성 검증 (~860ms) |
 | **스튜어드 시스템** | 도메인 기반 소유권, init 시 자동 할당 |
 | **팀 TODO** | 스튜어드 및 이슈와 연동된 공유 작업 관리 |
@@ -210,12 +210,7 @@ domains:
 
 ## 세션 공유
 
-외부 인프라 없이 Claude 세션 지식을 공유합니다:
-
-```bash
-# 선택적 심볼릭 링크 설정 (개발자별)
-bunx omcustom-team link
-```
+외부 인프라 없이 Claude 세션 지식을 공유합니다. 세션 공유는 `omcustom-team init`이 생성하는 `.claude/team/` 디렉토리를 통해 작동하며 — 추가 설정이 필요하지 않습니다.
 
 ### 공유 범위
 
