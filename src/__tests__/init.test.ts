@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   detectProjectName,
   initTeam,
+  migrateTeamFiles,
   scaffoldClaudeMd,
   scaffoldTeamDir,
   scanProject,
@@ -34,6 +35,80 @@ function write(dir: string, relPath: string, content = ''): void {
   mkdirSync(join(full, '..'), { recursive: true });
   writeFileSync(full, content, 'utf-8');
 }
+
+// ── migrateTeamFiles ─────────────────────────────────────────────────────────
+
+describe('migrateTeamFiles', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  it('migrates root-level team.yaml to .claude/team/team.yaml', () => {
+    write(tmpDir, 'team.yaml', 'members: []\n');
+
+    migrateTeamFiles(tmpDir);
+
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'team.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'team.yaml'))).toBe(false);
+    expect(readFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), 'utf-8')).toBe(
+      'members: []\n',
+    );
+  });
+
+  it('migrates root-level STEWARDS.yaml to .claude/team/STEWARDS.yaml', () => {
+    write(tmpDir, 'STEWARDS.yaml', 'domains: []\n');
+
+    migrateTeamFiles(tmpDir);
+
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'STEWARDS.yaml'))).toBe(false);
+    expect(readFileSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'), 'utf-8')).toBe(
+      'domains: []\n',
+    );
+  });
+
+  it('does not overwrite existing .claude/team/ files', () => {
+    // Pre-existing destination
+    mkdirSync(join(tmpDir, '.claude', 'team'), { recursive: true });
+    writeFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), '# existing\n', 'utf-8');
+    // Root-level source
+    write(tmpDir, 'team.yaml', 'members: []\n');
+
+    migrateTeamFiles(tmpDir);
+
+    // Destination must be unchanged
+    expect(readFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), 'utf-8')).toBe(
+      '# existing\n',
+    );
+    // Source must still exist (not removed because destination was not empty)
+    expect(existsSync(join(tmpDir, 'team.yaml'))).toBe(true);
+  });
+
+  it('does nothing when no root-level files exist', () => {
+    const moved = migrateTeamFiles(tmpDir);
+
+    expect(moved).toEqual([]);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'team.yaml'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'))).toBe(false);
+  });
+
+  it('returns list of migrated source paths', () => {
+    write(tmpDir, 'team.yaml', 'members: []\n');
+    write(tmpDir, 'STEWARDS.yaml', 'domains: []\n');
+
+    const moved = migrateTeamFiles(tmpDir);
+
+    expect(moved).toHaveLength(2);
+    expect(moved).toContain(join(tmpDir, 'team.yaml'));
+    expect(moved).toContain(join(tmpDir, 'STEWARDS.yaml'));
+  });
+});
 
 // ── scanProject ──────────────────────────────────────────────────────────────
 
