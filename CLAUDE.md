@@ -310,7 +310,7 @@ Team collaboration addon for oh-my-customcode.
 ## Project Info
 
 - **Language**: TypeScript (Bun runtime)
-- **Version**: 0.6.3
+- **Version**: 0.31.1
 - **License**: MIT
 - **Peer Dependency**: oh-my-customcode >= 0.23.0
 
