@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   detectProjectName,
   initTeam,
+  migrateTeamFiles,
   scaffoldClaudeMd,
   scaffoldTeamDir,
   scanProject,
@@ -34,6 +35,80 @@ function write(dir: string, relPath: string, content = ''): void {
   mkdirSync(join(full, '..'), { recursive: true });
   writeFileSync(full, content, 'utf-8');
 }
+
+// ── migrateTeamFiles ─────────────────────────────────────────────────────────
+
+describe('migrateTeamFiles', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  it('migrates root-level team.yaml to .claude/team/team.yaml', () => {
+    write(tmpDir, 'team.yaml', 'members: []\n');
+
+    migrateTeamFiles(tmpDir);
+
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'team.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'team.yaml'))).toBe(false);
+    expect(readFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), 'utf-8')).toBe(
+      'members: []\n',
+    );
+  });
+
+  it('migrates root-level STEWARDS.yaml to .claude/team/STEWARDS.yaml', () => {
+    write(tmpDir, 'STEWARDS.yaml', 'domains: []\n');
+
+    migrateTeamFiles(tmpDir);
+
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'STEWARDS.yaml'))).toBe(false);
+    expect(readFileSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'), 'utf-8')).toBe(
+      'domains: []\n',
+    );
+  });
+
+  it('does not overwrite existing .claude/team/ files', () => {
+    // Pre-existing destination
+    mkdirSync(join(tmpDir, '.claude', 'team'), { recursive: true });
+    writeFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), '# existing\n', 'utf-8');
+    // Root-level source
+    write(tmpDir, 'team.yaml', 'members: []\n');
+
+    migrateTeamFiles(tmpDir);
+
+    // Destination must be unchanged
+    expect(readFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), 'utf-8')).toBe(
+      '# existing\n',
+    );
+    // Source must still exist (not removed because destination was not empty)
+    expect(existsSync(join(tmpDir, 'team.yaml'))).toBe(true);
+  });
+
+  it('does nothing when no root-level files exist', () => {
+    const moved = migrateTeamFiles(tmpDir);
+
+    expect(moved).toEqual([]);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'team.yaml'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'))).toBe(false);
+  });
+
+  it('returns list of migrated source paths', () => {
+    write(tmpDir, 'team.yaml', 'members: []\n');
+    write(tmpDir, 'STEWARDS.yaml', 'domains: []\n');
+
+    const moved = migrateTeamFiles(tmpDir);
+
+    expect(moved).toHaveLength(2);
+    expect(moved).toContain(join(tmpDir, 'team.yaml'));
+    expect(moved).toContain(join(tmpDir, 'STEWARDS.yaml'));
+  });
+});
 
 // ── scanProject ──────────────────────────────────────────────────────────────
 
@@ -340,23 +415,24 @@ describe('initTeam', () => {
     write(tmpDir, 'package.json', JSON.stringify({ name: 'init-test' }));
     const result = await initTeam(tmpDir);
 
-    expect(result.teamConfigPath).toBe(join(tmpDir, 'team.yaml'));
-    expect(result.stewardsPath).toBe(join(tmpDir, 'STEWARDS.yaml'));
+    expect(result.teamConfigPath).toBe(join(tmpDir, '.claude', 'team', 'team.yaml'));
+    expect(result.stewardsPath).toBe(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'));
     expect(result.teamDirPath).toBe(join(tmpDir, '.claude', 'team'));
   });
 
   it('creates team.yaml when absent', async () => {
     await initTeam(tmpDir);
-    expect(existsSync(join(tmpDir, 'team.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'team.yaml'))).toBe(true);
   });
 
   it('creates STEWARDS.yaml when absent', async () => {
     await initTeam(tmpDir);
-    expect(existsSync(join(tmpDir, 'STEWARDS.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'))).toBe(true);
   });
 
   it('does not overwrite existing team.yaml', async () => {
-    const teamPath = join(tmpDir, 'team.yaml');
+    mkdirSync(join(tmpDir, '.claude', 'team'), { recursive: true });
+    const teamPath = join(tmpDir, '.claude', 'team', 'team.yaml');
     writeFileSync(teamPath, '# custom\n', 'utf-8');
 
     await initTeam(tmpDir);
@@ -364,7 +440,8 @@ describe('initTeam', () => {
   });
 
   it('does not overwrite existing STEWARDS.yaml', async () => {
-    const stewardsPath = join(tmpDir, 'STEWARDS.yaml');
+    mkdirSync(join(tmpDir, '.claude', 'team'), { recursive: true });
+    const stewardsPath = join(tmpDir, '.claude', 'team', 'STEWARDS.yaml');
     writeFileSync(stewardsPath, '# custom stewards\n', 'utf-8');
 
     await initTeam(tmpDir);
@@ -394,14 +471,14 @@ describe('initTeam', () => {
     await initTeam(tmpDir);
     // Second call must not throw even though files now exist
     const result = await initTeam(tmpDir);
-    expect(result.teamConfigPath).toBe(join(tmpDir, 'team.yaml'));
+    expect(result.teamConfigPath).toBe(join(tmpDir, '.claude', 'team', 'team.yaml'));
   });
 
   it('uses project name from package.json in team.yaml', async () => {
     write(tmpDir, 'package.json', JSON.stringify({ name: 'cool-project' }));
     await initTeam(tmpDir);
 
-    const content = readFileSync(join(tmpDir, 'team.yaml'), 'utf-8');
+    const content = readFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), 'utf-8');
     expect(content).toContain('cool-project');
   });
 
@@ -419,6 +496,39 @@ describe('initTeam', () => {
   it('creates CLAUDE.md after initTeam', async () => {
     await initTeam(tmpDir);
     expect(existsSync(join(tmpDir, 'CLAUDE.md'))).toBe(true);
+  });
+});
+
+// ── initTeam → ReportGenerator integration ────────────────────────────────────
+
+describe('initTeam → ReportGenerator integration', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  it('initTeam creates files that ReportGenerator can read', async () => {
+    write(tmpDir, 'package.json', JSON.stringify({ name: 'integration-test' }));
+
+    const initResult = await initTeam(tmpDir);
+
+    expect(initResult.teamConfigPath).toBe(join(tmpDir, '.claude', 'team', 'team.yaml'));
+    expect(initResult.stewardsPath).toBe(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'));
+    expect(existsSync(initResult.teamConfigPath)).toBe(true);
+    expect(existsSync(initResult.stewardsPath)).toBe(true);
+
+    const { ReportGenerator } = await import('../report');
+    const generator = new ReportGenerator(tmpDir);
+    const outputPath = await generator.generate();
+
+    expect(existsSync(outputPath)).toBe(true);
+    const html = readFileSync(outputPath, 'utf-8');
+    expect(html).toContain('integration-test');
   });
 });
 

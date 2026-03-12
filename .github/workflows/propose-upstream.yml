@@ -187,11 +187,20 @@ jobs:
         run: |
           SHA_SHORT=$(echo "$COMMIT_SHA" | cut -c1-7)
 
+          # Ensure labels exist in upstream (ignore errors if already present)
+          gh label create "upstream-proposal" --repo "$UPSTREAM_REPO" --description "Proposals from downstream projects" --color "0E8A16" 2>/dev/null || true
+          gh label create "automated" --repo "$UPSTREAM_REPO" --description "Auto-generated" --color "EDEDED" 2>/dev/null || true
+
+          # Create issue with labels (fallback to no labels if it still fails)
           gh issue create \
             --repo "$UPSTREAM_REPO" \
             --title "upstream: oh-my-teammates proposal ($SHA_SHORT)" \
             --body-file /tmp/proposal-body.md \
-            --label "upstream-proposal,automated"
+            --label "upstream-proposal,automated" 2>/dev/null || \
+          gh issue create \
+            --repo "$UPSTREAM_REPO" \
+            --title "upstream: oh-my-teammates proposal ($SHA_SHORT)" \
+            --body-file /tmp/proposal-body.md
 
       - name: Dry run output
         if: >

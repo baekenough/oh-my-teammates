@@ -8,13 +8,13 @@ This project uses [oh-my-teammates](https://github.com/baekenough/oh-my-teammate
 
 | File | Purpose |
 |------|---------|
-| `team.yaml` | Team member mapping and roles |
-| `STEWARDS.yaml` | Domain ownership assignments |
+| `.claude/team/team.yaml` | Team member mapping and roles |
+| `.claude/team/STEWARDS.yaml` | Domain ownership assignments |
 | `.claude/team/TODO.md` | Shared team tasks |
 
 ### Steward Delegation
 
-Code review assignments follow domain stewardship defined in `STEWARDS.yaml`.
+Code review assignments follow domain stewardship defined in `.claude/team/STEWARDS.yaml`.
 Each domain has a primary and backup steward for review routing.
 
 ### Session Sharing
