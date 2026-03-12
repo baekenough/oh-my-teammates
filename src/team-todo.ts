@@ -184,7 +184,7 @@ export class TeamTodo {
    * from STEWARDS.yaml and set it as the assignee.
    * Returns the number of items updated.
    */
-  autoAssign(stewardsPath = 'STEWARDS.yaml'): number {
+  autoAssign(stewardsPath = '.claude/team/STEWARDS.yaml'): number {
     const stewards = new Stewards(stewardsPath);
     if (!stewards.exists()) {
       return 0;

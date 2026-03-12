@@ -340,23 +340,24 @@ describe('initTeam', () => {
     write(tmpDir, 'package.json', JSON.stringify({ name: 'init-test' }));
     const result = await initTeam(tmpDir);
 
-    expect(result.teamConfigPath).toBe(join(tmpDir, 'team.yaml'));
-    expect(result.stewardsPath).toBe(join(tmpDir, 'STEWARDS.yaml'));
+    expect(result.teamConfigPath).toBe(join(tmpDir, '.claude', 'team', 'team.yaml'));
+    expect(result.stewardsPath).toBe(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'));
     expect(result.teamDirPath).toBe(join(tmpDir, '.claude', 'team'));
   });
 
   it('creates team.yaml when absent', async () => {
     await initTeam(tmpDir);
-    expect(existsSync(join(tmpDir, 'team.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'team.yaml'))).toBe(true);
   });
 
   it('creates STEWARDS.yaml when absent', async () => {
     await initTeam(tmpDir);
-    expect(existsSync(join(tmpDir, 'STEWARDS.yaml'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'))).toBe(true);
   });
 
   it('does not overwrite existing team.yaml', async () => {
-    const teamPath = join(tmpDir, 'team.yaml');
+    mkdirSync(join(tmpDir, '.claude', 'team'), { recursive: true });
+    const teamPath = join(tmpDir, '.claude', 'team', 'team.yaml');
     writeFileSync(teamPath, '# custom\n', 'utf-8');
 
     await initTeam(tmpDir);
@@ -364,7 +365,8 @@ describe('initTeam', () => {
   });
 
   it('does not overwrite existing STEWARDS.yaml', async () => {
-    const stewardsPath = join(tmpDir, 'STEWARDS.yaml');
+    mkdirSync(join(tmpDir, '.claude', 'team'), { recursive: true });
+    const stewardsPath = join(tmpDir, '.claude', 'team', 'STEWARDS.yaml');
     writeFileSync(stewardsPath, '# custom stewards\n', 'utf-8');
 
     await initTeam(tmpDir);
@@ -394,14 +396,14 @@ describe('initTeam', () => {
     await initTeam(tmpDir);
     // Second call must not throw even though files now exist
     const result = await initTeam(tmpDir);
-    expect(result.teamConfigPath).toBe(join(tmpDir, 'team.yaml'));
+    expect(result.teamConfigPath).toBe(join(tmpDir, '.claude', 'team', 'team.yaml'));
   });
 
   it('uses project name from package.json in team.yaml', async () => {
     write(tmpDir, 'package.json', JSON.stringify({ name: 'cool-project' }));
     await initTeam(tmpDir);
 
-    const content = readFileSync(join(tmpDir, 'team.yaml'), 'utf-8');
+    const content = readFileSync(join(tmpDir, '.claude', 'team', 'team.yaml'), 'utf-8');
     expect(content).toContain('cool-project');
   });
 
@@ -419,6 +421,39 @@ describe('initTeam', () => {
   it('creates CLAUDE.md after initTeam', async () => {
     await initTeam(tmpDir);
     expect(existsSync(join(tmpDir, 'CLAUDE.md'))).toBe(true);
+  });
+});
+
+// ── initTeam → ReportGenerator integration ────────────────────────────────────
+
+describe('initTeam → ReportGenerator integration', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  it('initTeam creates files that ReportGenerator can read', async () => {
+    write(tmpDir, 'package.json', JSON.stringify({ name: 'integration-test' }));
+
+    const initResult = await initTeam(tmpDir);
+
+    expect(initResult.teamConfigPath).toBe(join(tmpDir, '.claude', 'team', 'team.yaml'));
+    expect(initResult.stewardsPath).toBe(join(tmpDir, '.claude', 'team', 'STEWARDS.yaml'));
+    expect(existsSync(initResult.teamConfigPath)).toBe(true);
+    expect(existsSync(initResult.stewardsPath)).toBe(true);
+
+    const { ReportGenerator } = await import('../report');
+    const generator = new ReportGenerator(tmpDir);
+    const outputPath = await generator.generate();
+
+    expect(existsSync(outputPath)).toBe(true);
+    const html = readFileSync(outputPath, 'utf-8');
+    expect(html).toContain('integration-test');
   });
 });
 

@@ -2,7 +2,15 @@
  * Project initialization
  * Analyzes existing project to recommend team configuration
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { DEFAULT_DOMAINS, Stewards } from './stewards';
 import { TeamConfig } from './team-config';
@@ -211,13 +219,13 @@ This project uses [oh-my-teammates](https://github.com/baekenough/oh-my-teammate
 
 | File | Purpose |
 |------|---------|
-| \`team.yaml\` | Team member mapping and roles |
-| \`STEWARDS.yaml\` | Domain ownership assignments |
+| \`.claude/team/team.yaml\` | Team member mapping and roles |
+| \`.claude/team/STEWARDS.yaml\` | Domain ownership assignments |
 | \`.claude/team/TODO.md\` | Shared team tasks |
 
 ### Steward Delegation
 
-Code review assignments follow domain stewardship defined in \`STEWARDS.yaml\`.
+Code review assignments follow domain stewardship defined in \`.claude/team/STEWARDS.yaml\`.
 Each domain has a primary and backup steward for review routing.
 
 ### Session Sharing
@@ -308,13 +316,42 @@ export function scaffoldTeamDir(rootDir = '.', analysisSkillAvailable = false): 
 }
 
 /**
+ * Migrate legacy root-level `team.yaml` and `STEWARDS.yaml` to `.claude/team/`.
+ *
+ * Only moves a file if the source exists at the project root AND the destination
+ * does not yet exist (to avoid overwriting existing data). After copying, the
+ * source file is removed.
+ *
+ * @returns Array of source paths that were successfully migrated.
+ */
+export function migrateTeamFiles(rootDir = '.'): string[] {
+  const moved: string[] = [];
+  const teamDir = join(rootDir, '.claude', 'team');
+  const migrations: Array<[string, string]> = [
+    [join(rootDir, 'team.yaml'), join(teamDir, 'team.yaml')],
+    [join(rootDir, 'STEWARDS.yaml'), join(teamDir, 'STEWARDS.yaml')],
+  ];
+  for (const [src, dest] of migrations) {
+    if (existsSync(src) && !existsSync(dest)) {
+      mkdirSync(teamDir, { recursive: true });
+      const content = readFileSync(src, 'utf-8');
+      writeFileSync(dest, content, 'utf-8');
+      rmSync(src);
+      moved.push(src);
+    }
+  }
+  return moved;
+}
+
+/**
  * Run full project initialization:
  *
  * 1. Scan project for domains, file patterns, and dependency files.
- * 2. Scaffold `.claude/team/` directory with TODO.md.
- * 3. Create `team.yaml` template (if absent).
- * 4. Create `STEWARDS.yaml` draft (if absent).
- * 5. Create or update `CLAUDE.md` with team collaboration section.
+ * 2. Migrate legacy root-level team files to `.claude/team/` (existing users).
+ * 3. Scaffold `.claude/team/` directory with TODO.md.
+ * 4. Create `.claude/team/team.yaml` template (if absent).
+ * 5. Create `.claude/team/STEWARDS.yaml` draft (if absent).
+ * 6. Create or update `CLAUDE.md` with team collaboration section.
  *
  * Returns paths to the created/located files plus the scan result.
  */
@@ -329,23 +366,26 @@ export async function initTeam(rootDir = '.'): Promise<{
   // 1. Scan project
   const scanResult = scanProject(rootDir);
 
-  // 2. Scaffold .claude/team/ directory (pass analysis skill availability)
+  // 2. Migrate legacy root-level team files to .claude/team/ (for existing users)
+  migrateTeamFiles(rootDir);
+
+  // 3. Scaffold .claude/team/ directory (pass analysis skill availability)
   scaffoldTeamDir(rootDir, scanResult.analysisSkillAvailable);
 
-  // 3. Create team.yaml template if it doesn't exist
-  const teamConfigPath = join(rootDir, 'team.yaml');
+  // 4. Create team.yaml template if it doesn't exist
+  const teamConfigPath = join(rootDir, '.claude', 'team', 'team.yaml');
   if (!existsSync(teamConfigPath)) {
     const projectName = detectProjectName(rootDir);
     TeamConfig.createTemplate(teamConfigPath, projectName);
   }
 
-  // 4. Create STEWARDS.yaml draft based on scan results
-  const stewardsPath = join(rootDir, 'STEWARDS.yaml');
+  // 5. Create STEWARDS.yaml draft based on scan results
+  const stewardsPath = join(rootDir, '.claude', 'team', 'STEWARDS.yaml');
   if (!existsSync(stewardsPath)) {
     Stewards.createTemplate(stewardsPath);
   }
 
-  // 5. Create or update CLAUDE.md with team collaboration section
+  // 6. Create or update CLAUDE.md with team collaboration section
   const projectName = detectProjectName(rootDir);
   const claudeMdPath = join(rootDir, 'CLAUDE.md');
   const claudeMdResult = scaffoldClaudeMd(rootDir, projectName);
