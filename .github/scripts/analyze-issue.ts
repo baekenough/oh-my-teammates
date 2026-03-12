@@ -13,6 +13,8 @@
  * - ISSUE_TITLE, ISSUE_BODY, ISSUE_AUTHOR, ISSUE_LABELS: Optional overrides
  */
 
+import { fetchWithRetry } from './utils/fetch-retry.ts';
+
 // ============================================================================
 // Interfaces
 // ============================================================================
@@ -96,17 +98,20 @@ async function fetchIssueFromGitHub(issueNumber: number): Promise<IssueData> {
 
   const url = `https://api.github.com/repos/${CONFIG.githubRepo}/issues/${issueNumber}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${CONFIG.githubToken}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'oh-my-teammates-issue-analyzer',
+  const response = await fetchWithRetry(
+    url,
+    {
+      headers: {
+        Authorization: `Bearer ${CONFIG.githubToken}`,
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'oh-my-teammates-issue-analyzer',
+      },
     },
-  });
+    { timeoutMs: 30000 },
+  );
 
   if (!response.ok) {
-    console.error(`GitHub API error: ${response.status} ${response.statusText}`);
-    process.exit(1);
+    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
   }
 
   const issue = await response.json();
@@ -125,21 +130,30 @@ async function fetchOpenIssueTitles(): Promise<string[]> {
 
   const url = `https://api.github.com/repos/${CONFIG.githubRepo}/issues?state=open&per_page=100`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${CONFIG.githubToken}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'oh-my-teammates-issue-analyzer',
-    },
-  });
+  try {
+    const response = await fetchWithRetry(
+      url,
+      {
+        headers: {
+          Authorization: `Bearer ${CONFIG.githubToken}`,
+          Accept: 'application/vnd.github.v3+json',
+          'User-Agent': 'oh-my-teammates-issue-analyzer',
+        },
+      },
+      { timeoutMs: 30000 },
+    );
 
-  if (!response.ok) {
-    console.warn(`Warning: Failed to fetch open issues for duplicate check: ${response.status}`);
+    if (!response.ok) {
+      console.warn(`Warning: Failed to fetch open issues for duplicate check: ${response.status}`);
+      return [];
+    }
+
+    const issues = await response.json();
+    return issues.map((i: { title: string }) => i.title || '');
+  } catch (error) {
+    console.warn('Warning: Failed to fetch open issues for duplicate check:', error);
     return [];
   }
-
-  const issues = await response.json();
-  return issues.map((i: { title: string }) => i.title || '');
 }
 
 function getIssueData(issueNumber: number): Promise<IssueData> {
@@ -226,24 +240,27 @@ async function analyzeIssueWithClaude(
 
   const prompt = buildPrompt(issue, openIssueTitles);
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': CONFIG.anthropicApiKey as string,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+  const response = await fetchWithRetry(
+    'https://api.anthropic.com/v1/messages',
+    {
+      method: 'POST',
+      headers: {
+        'x-api-key': CONFIG.anthropicApiKey as string,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: CONFIG.model,
+        max_tokens: CONFIG.maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     },
-    body: JSON.stringify({
-      model: CONFIG.model,
-      max_tokens: CONFIG.maxTokens,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
+    { timeoutMs: 60000 },
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Claude API error: ${response.status} - ${errorText}`);
-    process.exit(1);
+    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
@@ -347,16 +364,20 @@ function formatComment(analysis: AnalysisResult): string {
 async function postComment(issueNumber: number, body: string): Promise<void> {
   const url = `https://api.github.com/repos/${CONFIG.githubRepo}/issues/${issueNumber}/comments`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${CONFIG.githubToken}`,
-      Accept: 'application/vnd.github.v3+json',
-      'Content-Type': 'application/json',
-      'User-Agent': 'oh-my-teammates-issue-analyzer',
+  const response = await fetchWithRetry(
+    url,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${CONFIG.githubToken}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'oh-my-teammates-issue-analyzer',
+      },
+      body: JSON.stringify({ body }),
     },
-    body: JSON.stringify({ body }),
-  });
+    { timeoutMs: 30000 },
+  );
 
   if (!response.ok) {
     const errorText = await response.text();

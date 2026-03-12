@@ -9,6 +9,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { $ } from 'bun';
+import { fetchWithRetry } from './utils/fetch-retry.ts';
 
 const GIT_LOG_FORMAT = '--pretty=format:%h %s';
 
@@ -239,22 +240,38 @@ async function generateReleaseNotes(version?: string): Promise<string> {
     return buildFallbackNotes(releaseVersion, changelogSection, commits);
   }
 
-  const Anthropic = (await import('@anthropic-ai/sdk')).default;
-  const client = new Anthropic({ apiKey });
-
-  const message = await client.messages.create({
-    model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
-    max_tokens: 2048,
-    messages: [
-      {
-        role: 'user',
-        content: buildPrompt(releaseVersion, commits, changedFiles, changelogSection),
+  const response = await fetchWithRetry(
+    'https://api.anthropic.com/v1/messages',
+    {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
       },
-    ],
-  });
+      body: JSON.stringify({
+        model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        messages: [
+          {
+            role: 'user',
+            content: buildPrompt(releaseVersion, commits, changedFiles, changelogSection),
+          },
+        ],
+      }),
+    },
+    { timeoutMs: 60000 },
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = (await response.json()) as { content: Array<{ type: string; text: string }> };
 
   const resultParts: string[] = [];
-  for (const block of message.content) {
+  for (const block of data.content) {
     if (block.type === 'text') {
       resultParts.push(block.text);
     }
@@ -271,13 +288,7 @@ if (import.meta.main) {
     const result = await generateReleaseNotes(version);
     console.log(result);
   } catch (error) {
-    const Anthropic = await import('@anthropic-ai/sdk');
-    if (error instanceof Anthropic.default.APIError) {
-      console.error(`⚠️ Claude API 호출 중 오류가 발생했습니다: ${error.message}`);
-      process.exit(1);
-    } else {
-      console.error(`⚠️ 예기치 않은 오류: ${error}`);
-      process.exit(1);
-    }
+    console.error(`⚠️ 릴리스 노트 생성 중 오류: ${error instanceof Error ? error.message : error}`);
+    process.exit(1);
   }
 }
