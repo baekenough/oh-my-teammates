@@ -169,4 +169,49 @@ describe('runCli coverage', () => {
       promptSpy.mockRestore();
     });
   });
+
+  describe('doctor command', () => {
+    it('runs doctor --locks and prints check results', async () => {
+      const doctorModule = await import('../doctor');
+      const doctorSpy = spyOn(doctorModule, 'runDoctor').mockResolvedValue([
+        { check: 'file-integrity', status: 'pass', message: 'No locked files to verify' },
+      ]);
+
+      const { runCli } = await import('../cli');
+      await runCli(['doctor', '--locks']);
+
+      expect(consoleLogs.some((l) => l.includes('file-integrity'))).toBe(true);
+      doctorSpy.mockRestore();
+    });
+
+    it('exits with code 1 when doctor finds failures', async () => {
+      const doctorModule = await import('../doctor');
+      const doctorSpy = spyOn(doctorModule, 'runDoctor').mockResolvedValue([
+        { check: 'team.yaml', status: 'fail', message: 'not found' },
+      ]);
+
+      const processExitSpy = spyOn(process, 'exit').mockImplementation((code?: number) => {
+        throw new Error(`process.exit(${code})`);
+      });
+
+      const { runCli } = await import('../cli');
+      await expect(runCli(['doctor', '--config'])).rejects.toThrow('process.exit(1)');
+
+      doctorSpy.mockRestore();
+      processExitSpy.mockRestore();
+    });
+
+    it('runs doctor with --updates flag', async () => {
+      const doctorModule = await import('../doctor');
+      const doctorSpy = spyOn(doctorModule, 'runDoctor').mockResolvedValue([
+        { check: 'updates', status: 'pass', message: 'Up to date (0.8.0)' },
+      ]);
+
+      const { runCli } = await import('../cli');
+      await runCli(['doctor', '--updates']);
+
+      expect(consoleLogs.some((l) => l.includes('updates'))).toBe(true);
+      doctorSpy.mockRestore();
+    });
+  });
 });
