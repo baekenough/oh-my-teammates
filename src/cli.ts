@@ -1,5 +1,6 @@
 import type { AgentCategory } from './agent-catalog';
 import { initTeam } from './init';
+import { TEAM_PATHS } from './paths';
 import { TeamTodo } from './team-todo';
 
 export async function runCli(args: string[]): Promise<void> {
@@ -78,7 +79,7 @@ export async function runCli(args: string[]): Promise<void> {
             process.exit(1);
           }
           if (!todo.exists()) {
-            TeamTodo.createTemplate('.claude/team/TODO.md');
+            TeamTodo.createTemplate(TEAM_PATHS.TODO_MD);
           } else {
             todo.load();
           }
@@ -104,7 +105,7 @@ export async function runCli(args: string[]): Promise<void> {
       const { SessionLogger } = await import('./session-logger');
       const { existsSync } = await import('node:fs');
       const { resolve } = await import('node:path');
-      const dbPath = resolve('.', '.claude/team/sessions.db');
+      const dbPath = resolve('.', TEAM_PATHS.SESSIONS_DB);
 
       if (!existsSync(dbPath)) {
         console.log('No sessions database found. Run some Claude Code sessions first.');
@@ -196,8 +197,8 @@ export async function runCli(args: string[]): Promise<void> {
 
       const { existsSync } = await import('node:fs');
       const { resolve } = await import('node:path');
-      const sessionsDbPath = existsSync(resolve('.', '.claude/team/sessions.db'))
-        ? resolve('.', '.claude/team/sessions.db')
+      const sessionsDbPath = existsSync(resolve('.', TEAM_PATHS.SESSIONS_DB))
+        ? resolve('.', TEAM_PATHS.SESSIONS_DB)
         : undefined;
 
       const recommendations = recommender.recommend({ minConfidence, category, sessionsDbPath });
@@ -225,8 +226,30 @@ export async function runCli(args: string[]): Promise<void> {
       }
       break;
     }
+    case 'doctor': {
+      const { runDoctor } = await import('./doctor');
+      const checks = {
+        config: args.includes('--config'),
+        stewards: args.includes('--stewards'),
+        updates: args.includes('--updates'),
+        locks: args.includes('--locks'),
+      };
+
+      const results = await runDoctor(checks);
+
+      for (const r of results) {
+        const icon = r.status === 'pass' ? '\u2713' : r.status === 'warn' ? '!' : '\u2717';
+        console.log(`${icon} [${r.check}] ${r.message}`);
+      }
+
+      const hasFailure = results.some((r) => r.status === 'fail');
+      if (hasFailure) {
+        process.exit(1);
+      }
+      break;
+    }
     default: {
-      console.log('Usage: omcustom-team [init|todo|report|recommend|sessions]');
+      console.log('Usage: omcustom-team [init|todo|report|recommend|sessions|doctor]');
       console.log('');
       console.log('Commands:');
       console.log('  init [--yes|-y]    Initialize team configuration');
@@ -251,6 +274,12 @@ export async function runCli(args: string[]): Promise<void> {
       console.log('    --search, -s <term>  Search in summary/branch/user');
       console.log('    --user, -u <name>    Filter by user');
       console.log('    --limit, -l <n>      Max results (default: 20)');
+      console.log('');
+      console.log('Doctor options:');
+      console.log('    --config             Validate team.yaml');
+      console.log('    --stewards           Check steward coverage');
+      console.log('    --updates            Check for newer version');
+      console.log('    --locks              Verify file integrity');
       process.exit(1);
     }
   }
