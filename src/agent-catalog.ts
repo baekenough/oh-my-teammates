@@ -95,7 +95,7 @@ export const AGENT_CATALOG: AgentCatalogEntry[] = [
     },
   },
 
-  // ── Backend (6) — higher-priority than language detections ──────────────────
+  // ── Backend (5) — higher-priority than language detections ──────────────────
   {
     name: 'be-nestjs-expert',
     category: 'backend',

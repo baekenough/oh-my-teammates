@@ -27,21 +27,23 @@ jobs:
 
       - name: Get changed files since last run
         id: changes
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
         run: |
-          # Get the merge commit and its parents
-          MERGE_BASE=$(git log --merges -1 --format=%H 2>/dev/null || echo "")
-          if [ -z "$MERGE_BASE" ]; then
-            echo "No merge commits found, using last 2 commits"
-            DIFF_BASE="HEAD~1"
+          # Use push event range to scan only the triggering commits (not cumulative history)
+          # Fall back to HEAD~1..HEAD for first push (before is all zeros)
+          if [ -z "$BEFORE" ] || echo "$BEFORE" | grep -q "^0\{40\}$"; then
+            RANGE="HEAD~1..HEAD"
           else
-            DIFF_BASE="${MERGE_BASE}^1"
+            RANGE="${BEFORE}..${AFTER}"
           fi
 
-          CHANGED=$(git diff --name-only "$DIFF_BASE" HEAD -- src/ | tr '\n' ' ')
+          CHANGED=$(git diff --name-only "$RANGE" -- src/ | tr '\n' ' ')
           echo "files=$CHANGED" >> $GITHUB_OUTPUT
 
-          # Extract commit messages for analysis
-          MESSAGES=$(git log "$DIFF_BASE"..HEAD --format="%s" | tr '\n' '|')
+          # Extract commit messages for analysis (push event range only)
+          MESSAGES=$(git log "$RANGE" --format="%s" | tr '\n' '|')
           echo "messages=$MESSAGES" >> $GITHUB_OUTPUT
 
       - name: Detect proposable patterns
