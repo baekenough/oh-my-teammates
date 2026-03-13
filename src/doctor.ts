@@ -45,6 +45,8 @@ export async function runDoctor(
     results.push(...checkLocks(basePath));
   }
 
+  // --updates is opt-in only (not included in runAll) because it makes
+  // a network call to npm registry. Avoid slowing down local health checks.
   if (options.updates) {
     const updateResult = await checkUpdates();
     if (updateResult) {

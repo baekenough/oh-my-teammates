@@ -125,7 +125,11 @@ describe('runDoctor', () => {
 
     const results = await runDoctor({}, tmpDir);
 
-    // Should run at least config, stewards, and locks checks
+    // runAll runs config, stewards, and locks — but NOT updates (opt-in only, requires network)
+    const checkNames = results.map((r) => r.check);
+    expect(checkNames).toContain('team.yaml');
+    expect(checkNames).toContain('file-integrity');
+    expect(checkNames.includes('updates')).toBe(false);
     expect(results.length).toBeGreaterThanOrEqual(3);
   });
 
