@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
  * Reads and manages team.yaml for member mapping
  */
 import { parse, stringify } from 'yaml';
+import { TEAM_PATHS } from './paths';
 
 export interface TeamMember {
   github: string;
@@ -24,7 +25,7 @@ export class TeamConfig {
   private configPath: string;
   private data: TeamConfigData | null = null;
 
-  constructor(configPath = 'team.yaml') {
+  constructor(configPath: string = TEAM_PATHS.TEAM_YAML) {
     this.configPath = configPath;
   }
 

@@ -4,6 +4,7 @@
  */
 import { Database } from 'bun:sqlite';
 import { randomUUID } from 'node:crypto';
+import { TEAM_PATHS } from './paths';
 
 export interface Session {
   id: string;
@@ -49,7 +50,7 @@ export class SessionLogger {
   private db: Database;
   private currentSession: string | null = null;
 
-  constructor(dbPath = '.claude/team/sessions.db') {
+  constructor(dbPath: string = TEAM_PATHS.SESSIONS_DB) {
     this.db = new Database(dbPath, { create: true });
     this.db.exec('PRAGMA journal_mode=WAL');
     this.initSchema();

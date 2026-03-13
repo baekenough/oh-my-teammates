@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, extname, join } from 'node:path';
+import { TEAM_DIR, TEAM_PATHS } from './paths';
 import { DEFAULT_DOMAINS, Stewards } from './stewards';
 import { TeamConfig } from './team-config';
 
@@ -284,7 +285,7 @@ export function scaffoldClaudeMd(
  * @param analysisSkillAvailable - When true, a note about the /analysis skill is appended to TODO.md.
  */
 export function scaffoldTeamDir(rootDir = '.', analysisSkillAvailable = false): void {
-  const teamDir = join(rootDir, '.claude', 'team');
+  const teamDir = join(rootDir, TEAM_DIR);
   mkdirSync(teamDir, { recursive: true });
 
   const todoPath = join(teamDir, 'TODO.md');
@@ -326,10 +327,10 @@ export function scaffoldTeamDir(rootDir = '.', analysisSkillAvailable = false): 
  */
 export function migrateTeamFiles(rootDir = '.'): string[] {
   const moved: string[] = [];
-  const teamDir = join(rootDir, '.claude', 'team');
+  const teamDir = join(rootDir, TEAM_DIR);
   const migrations: Array<[string, string]> = [
-    [join(rootDir, 'team.yaml'), join(teamDir, 'team.yaml')],
-    [join(rootDir, 'STEWARDS.yaml'), join(teamDir, 'STEWARDS.yaml')],
+    [join(rootDir, 'team.yaml'), join(rootDir, TEAM_PATHS.TEAM_YAML)],
+    [join(rootDir, 'STEWARDS.yaml'), join(rootDir, TEAM_PATHS.STEWARDS_YAML)],
   ];
   for (const [src, dest] of migrations) {
     if (existsSync(src) && !existsSync(dest)) {
@@ -373,14 +374,14 @@ export async function initTeam(rootDir = '.'): Promise<{
   scaffoldTeamDir(rootDir, scanResult.analysisSkillAvailable);
 
   // 4. Create team.yaml template if it doesn't exist
-  const teamConfigPath = join(rootDir, '.claude', 'team', 'team.yaml');
+  const teamConfigPath = join(rootDir, TEAM_PATHS.TEAM_YAML);
   if (!existsSync(teamConfigPath)) {
     const projectName = detectProjectName(rootDir);
     TeamConfig.createTemplate(teamConfigPath, projectName);
   }
 
   // 5. Create STEWARDS.yaml draft based on scan results
-  const stewardsPath = join(rootDir, '.claude', 'team', 'STEWARDS.yaml');
+  const stewardsPath = join(rootDir, TEAM_PATHS.STEWARDS_YAML);
   if (!existsSync(stewardsPath)) {
     Stewards.createTemplate(stewardsPath);
   }
@@ -390,11 +391,21 @@ export async function initTeam(rootDir = '.'): Promise<{
   const claudeMdPath = join(rootDir, 'CLAUDE.md');
   const claudeMdResult = scaffoldClaudeMd(rootDir, projectName);
 
+  // 7. Register critical team files in lockfile
+  const { LockfileManager } = await import('./lockfile');
+  const lockMgr = new LockfileManager(rootDir);
+  if (existsSync(teamConfigPath)) {
+    lockMgr.lock(teamConfigPath);
+  }
+  if (existsSync(stewardsPath)) {
+    lockMgr.lock(stewardsPath);
+  }
+
   return {
     scanResult,
     teamConfigPath,
     stewardsPath,
-    teamDirPath: join(rootDir, '.claude', 'team'),
+    teamDirPath: join(rootDir, TEAM_DIR),
     claudeMdPath,
     claudeMdResult,
   };

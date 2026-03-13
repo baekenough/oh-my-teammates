@@ -60,7 +60,7 @@ describe('runCli', () => {
       await expect(runCli(['unknown-command'])).rejects.toThrow('process.exit(1)');
       expect(
         consoleLogs.some((l) =>
-          l.includes('Usage: omcustom-team [init|todo|report|recommend|sessions]'),
+          l.includes('Usage: omcustom-team [init|todo|report|recommend|sessions|doctor]'),
         ),
       ).toBe(true);
       expect(processExitCode).toBe(1);
@@ -71,7 +71,7 @@ describe('runCli', () => {
       await expect(runCli([])).rejects.toThrow('process.exit(1)');
       expect(
         consoleLogs.some((l) =>
-          l.includes('Usage: omcustom-team [init|todo|report|recommend|sessions]'),
+          l.includes('Usage: omcustom-team [init|todo|report|recommend|sessions|doctor]'),
         ),
       ).toBe(true);
       expect(processExitCode).toBe(1);

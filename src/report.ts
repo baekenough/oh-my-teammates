@@ -4,7 +4,7 @@
  */
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-
+import { TEAM_PATHS } from './paths';
 import type { ReportData } from './report-template';
 import { generateReportHtml } from './report-template';
 import { SessionLogger } from './session-logger';
@@ -28,7 +28,7 @@ export class ReportGenerator {
   }
 
   async generate(options: ReportOptions = {}): Promise<string> {
-    const outputPath = resolve(this.basePath, options.output ?? '.claude/team/report.html');
+    const outputPath = resolve(this.basePath, options.output ?? TEAM_PATHS.REPORT_HTML);
     const days = options.days;
 
     // 1. Collect data from all sources (graceful fallback)
@@ -86,7 +86,7 @@ export class ReportGenerator {
   // ── Private data collectors ───────────────────────────────────────────────
 
   private collectTeamConfig(): { name: string; members: ReportData['members'] } | null {
-    const configPath = resolve(this.basePath, '.claude/team/team.yaml');
+    const configPath = resolve(this.basePath, TEAM_PATHS.TEAM_YAML);
     try {
       const config = new TeamConfig(configPath);
       if (!config.exists()) {
@@ -108,7 +108,7 @@ export class ReportGenerator {
   }
 
   private collectDomains(): ReportData['domains'] | null {
-    const stewardsPath = resolve(this.basePath, '.claude/team/STEWARDS.yaml');
+    const stewardsPath = resolve(this.basePath, TEAM_PATHS.STEWARDS_YAML);
     try {
       const stewards = new Stewards(stewardsPath);
       if (!stewards.exists()) {
@@ -131,7 +131,7 @@ export class ReportGenerator {
   }
 
   private collectTodos(): TodoItem[] | null {
-    const todoPath = resolve(this.basePath, '.claude/team/TODO.md');
+    const todoPath = resolve(this.basePath, TEAM_PATHS.TODO_MD);
     try {
       const todo = new TeamTodo(todoPath);
       if (!todo.exists()) {
@@ -167,7 +167,7 @@ export class ReportGenerator {
     branchDistribution: ReportData['branchDistribution'];
     recentSessions: ReportData['recentSessions'];
   } | null {
-    const dbPath = resolve(this.basePath, '.claude/team/sessions.db');
+    const dbPath = resolve(this.basePath, TEAM_PATHS.SESSIONS_DB);
     let logger: SessionLogger | null = null;
     try {
       if (!existsSync(dbPath)) {
