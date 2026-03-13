@@ -105,3 +105,26 @@ jobs:
       - name: Skip team.yaml check (file absent)
         if: hashFiles('pr/.claude/team/team.yaml') == ''
         run: echo "::notice::team.yaml not present — skipping validation"
+
+      # ── Protected files integrity check ────────────────────────────────
+      - name: Verify protected file integrity
+        run: |
+          if [ -f "pr/.claude/team/.lockfile.json" ]; then
+            echo "Checking locked file integrity..."
+            cd pr
+            LOCKFILE=".claude/team/.lockfile.json"
+            FAILURES=0
+            for FILE in $(jq -r 'keys[]' "$LOCKFILE" 2>/dev/null); do
+              if [ ! -f "$FILE" ]; then
+                echo "::error::Locked file missing: $FILE"
+                FAILURES=$((FAILURES + 1))
+              fi
+            done
+            if [ "$FAILURES" -gt 0 ]; then
+              echo "::error::$FAILURES locked file(s) have issues"
+              exit 1
+            fi
+            echo "All locked files present"
+          else
+            echo "No lockfile found, skipping integrity check"
+          fi
