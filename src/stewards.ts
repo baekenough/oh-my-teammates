@@ -5,6 +5,7 @@ import { dirname } from 'node:path';
  * STEWARDS.yaml -> CODEOWNERS auto-generation
  */
 import { parse, stringify } from 'yaml';
+import { TEAM_PATHS } from './paths';
 
 export interface DomainSteward {
   primary: string;
@@ -92,7 +93,7 @@ export class Stewards {
   private configPath: string;
   private data: StewardsData | null = null;
 
-  constructor(configPath = 'STEWARDS.yaml') {
+  constructor(configPath: string = TEAM_PATHS.STEWARDS_YAML) {
     this.configPath = configPath;
   }
 

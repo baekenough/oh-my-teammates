@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { TEAM_PATHS } from './paths';
 import { Stewards } from './stewards';
 
 export interface TodoItem {
@@ -94,7 +95,7 @@ export class TeamTodo {
   private items: TodoItem[] = [];
   private header: string[] = [];
 
-  constructor(todoPath = '.claude/team/TODO.md') {
+  constructor(todoPath: string = TEAM_PATHS.TODO_MD) {
     this.todoPath = todoPath;
   }
 
@@ -184,7 +185,7 @@ export class TeamTodo {
    * from STEWARDS.yaml and set it as the assignee.
    * Returns the number of items updated.
    */
-  autoAssign(stewardsPath = '.claude/team/STEWARDS.yaml'): number {
+  autoAssign(stewardsPath: string = TEAM_PATHS.STEWARDS_YAML): number {
     const stewards = new Stewards(stewardsPath);
     if (!stewards.exists()) {
       return 0;
