@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-customcode/oh-my-teammates",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Team collaboration addon for oh-my-customcode - organizational harness management",
   "type": "module",
   "main": "dist/index.js",

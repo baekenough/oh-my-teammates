@@ -3,7 +3,7 @@
  * Produces a self-contained, inline-CSS HTML report (no external resources)
  */
 
-const VERSION = '0.8.0';
+const VERSION = '0.8.1';
 
 export interface ReportData {
   generatedAt: string;

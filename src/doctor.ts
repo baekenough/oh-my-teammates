@@ -24,7 +24,7 @@ export interface DoctorOptions {
 }
 
 const PACKAGE_NAME = '@oh-my-customcode/oh-my-teammates';
-const CURRENT_VERSION = '0.8.0';
+const CURRENT_VERSION = '0.8.1';
 
 export async function runDoctor(
   options: DoctorOptions,
