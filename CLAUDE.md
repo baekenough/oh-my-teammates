@@ -18,6 +18,10 @@ oh-my-customcode로 구동됩니다.
 |     [에이전트명] -> Tool: {도구}                                  |
 |     [에이전트명] -> Target: {경로}                                |
 |                                                                   |
+|  3. 2개 이상 에이전트를 스폰하려 하는가?                          |
+|     YES -> R018 체크: Agent Teams 필수 여부 확인                  |
+|     3+ 에이전트 OR 리뷰 사이클 -> Agent Teams 필수                |
+|                                                                   |
 |  하나라도 NO면 -> 즉시 수정 후 계속                               |
 +==================================================================+
 ```
@@ -121,6 +125,7 @@ oh-my-customcode로 구동됩니다.
 | R008 | 도구 식별 | **강제** - 모든 도구 사용 시 에이전트 표시 |
 | R009 | 병렬 실행 | **강제** - 병렬 실행, 대규모 작업 분해 |
 | R010 | 오케스트레이터 조율 | **강제** - 오케스트레이터 조율, 세션 연속성, 직접 실행 금지 |
+| R015 | 의도 투명성 | **필수** - 투명한 에이전트 라우팅 |
 | R016 | 지속적 개선 | **강제** - 위반 발생 시 규칙 업데이트 |
 | R017 | 동기화 검증 | **강제** - 구조 변경 전 검증 |
 | R018 | Agent Teams | **강제(조건부)** - Agent Teams 활성화 시 적합한 작업에 필수 사용 |
@@ -133,7 +138,7 @@ oh-my-customcode로 구동됩니다.
 | R011 | 메모리 통합 | claude-mem을 통한 세션 지속성 |
 | R012 | HUD 상태줄 | 실시간 상태 표시 |
 | R013 | Ecomode | 배치 작업 토큰 효율성 |
-| R015 | 의도 투명성 | **필수** - 투명한 에이전트 라우팅 |
+| R019 | Ontology-RAG 라우팅 | 라우팅 스킬의 ontology-RAG enrichment |
 
 ### MAY (선택)
 | ID | 규칙 | 설명 |
@@ -146,29 +151,31 @@ oh-my-customcode로 구동됩니다.
 
 | 커맨드 | 설명 |
 |--------|------|
-| `/analysis` | 프로젝트 분석 및 자동 커스터마이징 |
-| `/create-agent` | 새 에이전트 생성 |
-| `/update-docs` | 프로젝트 구조와 문서 동기화 |
-| `/update-external` | 외부 소스에서 에이전트 업데이트 |
-| `/audit-agents` | 에이전트 의존성 감사 |
-| `/fix-refs` | 깨진 참조 수정 |
+| `/omcustom:analysis` | 프로젝트 분석 및 자동 커스터마이징 |
+| `/omcustom:create-agent` | 새 에이전트 생성 |
+| `/omcustom:update-docs` | 프로젝트 구조와 문서 동기화 |
+| `/omcustom:update-external` | 외부 소스에서 에이전트 업데이트 |
+| `/omcustom:audit-agents` | 에이전트 의존성 감사 |
+| `/omcustom:fix-refs` | 깨진 참조 수정 |
 | `/dev-review` | 코드 베스트 프랙티스 리뷰 |
 | `/dev-refactor` | 코드 리팩토링 |
 | `/research` | 10-team 병렬 딥 분석 및 교차 검증 |
+| `/deep-plan` | 연구 검증 기반 계획 수립 |
+| `/structured-dev-cycle` | 6단계 구조적 개발 사이클 |
 | `/memory-save` | 세션 컨텍스트를 claude-mem에 저장 |
 | `/memory-recall` | 메모리 검색 및 리콜 |
-| `/monitoring-setup` | OTel 콘솔 모니터링 활성화/비활성화 |
-| `/npm-publish` | npm 레지스트리에 패키지 배포 |
-| `/npm-version` | 시맨틱 버전 관리 |
-| `/npm-audit` | 의존성 감사 |
+| `/omcustom:monitoring-setup` | OTel 콘솔 모니터링 활성화/비활성화 |
+| `/omcustom:npm-publish` | npm 레지스트리에 패키지 배포 |
+| `/omcustom:npm-version` | 시맨틱 버전 관리 |
+| `/omcustom:npm-audit` | 의존성 감사 |
 | `/codex-exec` | Codex CLI 프롬프트 실행 |
 | `/optimize-analyze` | 번들 및 성능 분석 |
 | `/optimize-bundle` | 번들 크기 최적화 |
 | `/optimize-report` | 최적화 리포트 생성 |
-| `/sauron-watch` | 전체 R017 검증 |
-| `/lists` | 모든 사용 가능한 커맨드 표시 |
-| `/status` | 시스템 상태 표시 |
-| `/help` | 도움말 표시 |
+| `/omcustom:sauron-watch` | 전체 R017 검증 |
+| `/omcustom:lists` | 모든 사용 가능한 커맨드 표시 |
+| `/omcustom:status` | 시스템 상태 표시 |
+| `/omcustom:help` | 도움말 표시 |
 
 ## 프로젝트 구조
 
@@ -176,12 +183,12 @@ oh-my-customcode로 구동됩니다.
 project/
 +-- CLAUDE.md                    # 진입점
 +-- .claude/
-|   +-- agents/                  # 서브에이전트 정의 (42 파일)
-|   +-- skills/                  # 스킬 (66 디렉토리)
-|   +-- rules/                   # 전역 규칙 (R000-R018)
+|   +-- agents/                  # 서브에이전트 정의 (44 파일)
+|   +-- skills/                  # 스킬 (71 디렉토리)
+|   +-- rules/                   # 전역 규칙 (R000-R019)
 |   +-- hooks/                   # 훅 스크립트 (메모리, HUD)
 |   +-- contexts/                # 컨텍스트 파일 (ecomode)
-+-- guides/                      # 레퍼런스 문서 (24 토픽)
++-- guides/                      # 레퍼런스 문서 (25 토픽)
 ```
 
 ## 오케스트레이션
@@ -210,7 +217,7 @@ project/
 | 타입 | 수량 | 에이전트 |
 |------|------|----------|
 | SW Engineer/Language | 6 | lang-golang-expert, lang-python-expert, lang-rust-expert, lang-kotlin-expert, lang-typescript-expert, lang-java21-expert |
-| SW Engineer/Backend | 5 | be-fastapi-expert, be-springboot-expert, be-go-backend-expert, be-express-expert, be-nestjs-expert |
+| SW Engineer/Backend | 6 | be-fastapi-expert, be-springboot-expert, be-go-backend-expert, be-express-expert, be-nestjs-expert, be-django-expert |
 | SW Engineer/Frontend | 4 | fe-vercel-agent, fe-vuejs-agent, fe-svelte-agent, fe-flutter-agent |
 | SW Engineer/Tooling | 3 | tool-npm-expert, tool-optimizer, tool-bun-expert |
 | DE Engineer | 6 | de-airflow-expert, de-dbt-expert, de-spark-expert, de-kafka-expert, de-snowflake-expert, de-pipeline-expert |
@@ -220,7 +227,8 @@ project/
 | QA Team | 3 | qa-planner, qa-writer, qa-engineer |
 | Manager | 6 | mgr-creator, mgr-updater, mgr-supplier, mgr-gitnerd, mgr-sauron, mgr-claude-code-bible |
 | System | 2 | sys-memory-keeper, sys-naggy |
-| **총계** | **42** | |
+| Security | 1 | sec-codeql-expert |
+| **총계** | **44** | |
 
 ## Agent Teams (MUST when enabled)
 
@@ -242,15 +250,15 @@ Claude Code의 Agent Teams 기능이 활성화되어 있으면 (`CLAUDE_CODE_EXP
 
 ```bash
 # 프로젝트 분석
-/analysis
+/omcustom:analysis
 
 # 모든 커맨드 표시
-/lists
+/omcustom:lists
 
 # 에이전트 관리
-/create-agent my-agent
-/update-docs
-/audit-agents
+/omcustom:create-agent my-agent
+/omcustom:update-docs
+/omcustom:audit-agents
 
 # 코드 리뷰
 /dev-review src/main.go
@@ -260,7 +268,7 @@ Claude Code의 Agent Teams 기능이 활성화되어 있으면 (`CLAUDE_CODE_EXP
 /memory-recall authentication
 
 # 검증
-/sauron-watch
+/omcustom:sauron-watch
 ```
 
 ## 외부 의존성
